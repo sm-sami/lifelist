@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export default function SignIn() {
+export default function SignUp() {
   const { colors, type, radius, space } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -23,12 +23,16 @@ export default function SignIn() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleSignIn() {
+  async function handleSignUp() {
     if (!email || !password) return;
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signUp({ email, password });
     setLoading(false);
-    if (error) Alert.alert("Sign-in failed", error.message);
+    if (error) {
+      Alert.alert("Sign-up failed", error.message);
+    } else {
+      Alert.alert("Check your email", "We sent you a confirmation link.");
+    }
   }
 
   return (
@@ -49,7 +53,7 @@ export default function SignIn() {
           Lifelist
         </Text>
         <Text style={[type.paraRegular, { color: colors.textSecondary, marginBottom: space[8] }]}>
-          Sign in to your bucket list
+          Create your bucket list
         </Text>
 
         <TextInput
@@ -90,7 +94,7 @@ export default function SignIn() {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
-          textContentType="password"
+          textContentType="newPassword"
           accessibilityLabel="Password"
         />
 
@@ -104,27 +108,27 @@ export default function SignIn() {
               opacity: loading ? 0.6 : 1,
             },
           ]}
-          onPress={handleSignIn}
+          onPress={handleSignUp}
           disabled={loading}
           accessibilityRole="button"
-          accessibilityLabel="Sign in"
+          accessibilityLabel="Create account"
           accessibilityState={{ disabled: loading, busy: loading }}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={[type.cta, { color: "#fff" }]}>Sign in</Text>
+            <Text style={[type.cta, { color: "#fff" }]}>Create account</Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => router.replace("/(auth)/sign-up")}
+          onPress={() => router.replace("/(auth)/sign-in")}
           style={{ marginTop: space[5], alignItems: "center" }}
           accessibilityRole="button"
-          accessibilityLabel="Don't have an account? Sign up"
+          accessibilityLabel="Already have an account? Sign in"
         >
           <Text style={[type.paraRegular, { color: colors.textSecondary }]}>
-            Don't have an account? <Text style={{ color: colors.accent }}>Sign up</Text>
+            Already have an account? <Text style={{ color: colors.accent }}>Sign in</Text>
           </Text>
         </TouchableOpacity>
       </View>

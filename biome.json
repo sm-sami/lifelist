@@ -29,6 +29,8 @@
       "**/node_modules/**",
       "**/dist/**",
       "**/coverage/**",
+      "**/ios/**",
+      "**/android/**",
       "supabase/.branches/**",
       "supabase/.temp/**"
     ]
