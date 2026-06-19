@@ -1,3 +1,4 @@
+import { useHydrateItems } from "@/hooks/useHydrateItems";
 import { useTheme, useThemeMode } from "@/lib/useTheme";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
@@ -7,6 +8,7 @@ import { Platform, StyleSheet } from "react-native";
 export default function TabsLayout() {
   const { colors } = useTheme();
   const { resolved } = useThemeMode();
+  useHydrateItems();
 
   return (
     <Tabs
