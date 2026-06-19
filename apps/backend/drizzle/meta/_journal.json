@@ -15,6 +15,13 @@
       "when": 1750355000000,
       "tag": "0001_add_item_embedding",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1750356000000,
+      "tag": "0002_user_provisioning_trigger",
+      "breakpoints": true
     }
   ]
 }

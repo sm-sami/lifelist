@@ -50,6 +50,21 @@ pnpm -r test     # phase tests
 ```
 Both must exit 0. **Never mark a phase ✅ in the ledger if the gate fails** (`session.sh handoff` enforces this).
 
+## Addenda (`plans/addendum/`)
+
+Addenda are cross-cutting corrections to already-written phase plans — architecture
+changes, security fixes, or approach improvements discovered during execution.
+
+- Each addendum lives at `plans/addendum/<NNN>-<name>.md` and lists which phases it
+  **affects** in its header.
+- **Before starting any phase**, run `ls plans/addendum/` and read any addendum whose
+  `Affects:` list includes your phase. Addenda override the original phase doc where
+  they conflict.
+- Addenda are tracked in `plans/PROGRESS.md` (separate section) and follow the same
+  branch/gate/merge workflow as phases: `phase/addendum-<NNN>`.
+- The `scripts/session.sh` script handles addendum IDs (`addendum/001`) identically to
+  phase IDs — `start`, `handoff`, and `merge-to-main.sh` all work unchanged.
+
 ## Conventions
 - pnpm only (`pnpm add`, `pnpm <script>`, `pnpm tsx`, `pnpm expo`). Never npm/npx.
 - Work on `phase/<id>` branches, never directly on `main`.

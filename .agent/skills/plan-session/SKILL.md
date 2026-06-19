@@ -48,6 +48,15 @@ creation (`phase/<id>`), the session handoff file, and runs `pnpm gate` on hando
    `plans/sessions/<id>-<you>-<date>.md`. Then run `handoff done` (or `blocked`/`paused`).
    If the gate fails, the script flips it to `🔴` — report why.
 
+## Addenda
+Before executing any phase, run:
+```bash
+ls plans/addendum/ 2>/dev/null
+```
+Read every addendum whose `Affects:` header includes your phase — addenda **override**
+the original phase doc where they conflict. Addenda use the same `start`/`handoff`/
+`merge-to-main.sh` workflow with IDs like `addendum/001`.
+
 ## Rules
 - One author → one in-progress phase → one `phase/<id>` branch. Never edit code on `main`.
 - If `start` reports a phase is already `🟡` under someone else, pick another or coordinate.

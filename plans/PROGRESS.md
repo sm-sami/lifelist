@@ -57,6 +57,14 @@
 - **integration/003** (realtime item sync) needs **integration/001** + **backend/004**
   (it consumes the private `item.enriched` broadcast the enrich job emits).
 
+## Addenda (cross-cutting amendments — read before starting the affected phase)
+
+> An addendum overrides the original phase doc where they conflict. See `AGENTS.md` for the full convention.
+
+| Addendum | Title | Affects | Status | Owner | Branch | Updated (UTC) |
+|----------|-------|---------|--------|-------|--------|---------------|
+| addendum/001 | User provisioning trigger | backend/001, backend/002 | ✅ | mohamed.sami@headout.com | phase/addendum-001 | 2026-06-19 17:30 |
+
 ## How to use
 - `/plan-session status` — see the board + next free phases.
 - `/plan-session start [phase]` — claim + branch + begin.

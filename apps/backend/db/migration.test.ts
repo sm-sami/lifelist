@@ -9,7 +9,7 @@ const migrationFiles = readdirSync(migrationDirectory)
 
 describe("initial database migration", () => {
   it("contains the manually maintained database invariants", () => {
-    expect(migrationFiles).toHaveLength(2);
+    expect(migrationFiles).toHaveLength(3);
 
     const migration = readFileSync(join(migrationDirectory, migrationFiles[0]), "utf8");
 
@@ -43,5 +43,19 @@ describe("embedding migration", () => {
     expect(migration).toContain('ADD COLUMN "embedding" vector(1536)');
     expect(migration).toContain('ADD COLUMN "embedding_model" text');
     expect(migration).toContain('"items_embedding_model_pair"');
+  });
+});
+
+describe("user provisioning trigger migration", () => {
+  it("creates INSERT and UPDATE triggers on auth.users", () => {
+    const migration = readFileSync(join(migrationDirectory, migrationFiles[2]), "utf8");
+
+    expect(migration).toContain("handle_new_auth_user");
+    expect(migration).toContain("on_auth_user_created");
+    expect(migration).toContain("after insert on auth.users");
+    expect(migration).toContain("handle_auth_user_updated");
+    expect(migration).toContain("on_auth_user_updated");
+    expect(migration).toContain("after update of email, raw_user_meta_data on auth.users");
+    expect(migration).toContain("security definer set search_path = public");
   });
 });
