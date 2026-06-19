@@ -1,4 +1,5 @@
 import { useHydrateItems } from "@/hooks/useHydrateItems";
+import { useItemsRealtime } from "@/lib/realtime/useItemsRealtime";
 import { useTheme, useThemeMode } from "@/lib/useTheme";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
@@ -9,6 +10,7 @@ export default function TabsLayout() {
   const { colors } = useTheme();
   const { resolved } = useThemeMode();
   useHydrateItems();
+  useItemsRealtime();
 
   return (
     <Tabs
