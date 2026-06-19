@@ -9,7 +9,7 @@ vi.mock("./embed", () => ({
 }));
 
 import { db } from "../../db/client";
-import { findSemanticDuplicate } from "./dedup";
+import { findSemanticDuplicate, findTitleDuplicate } from "./dedup";
 
 const mockExecute = vi.mocked(db.execute);
 
@@ -54,5 +54,34 @@ describe("findSemanticDuplicate", () => {
     await findSemanticDuplicate(USER_ID, QUERY_VEC, tx);
     expect(txExecute).toHaveBeenCalledOnce();
     expect(mockExecute).not.toHaveBeenCalled();
+  });
+});
+
+describe("findTitleDuplicate", () => {
+  it("returns null when no canonical title matches", async () => {
+    mockExecute.mockResolvedValueOnce([{ id: "item-1", title: "Swim with dolphins" }] as never);
+    const result = await findTitleDuplicate(USER_ID, "Northern lights");
+    expect(result).toBeNull();
+  });
+
+  it("matches Northern lights against See the Northern Lights", async () => {
+    mockExecute.mockResolvedValueOnce([
+      { id: "item-2", title: "See the Northern Lights" },
+    ] as never);
+    const result = await findTitleDuplicate(USER_ID, "Northern lights");
+    expect(result).toMatchObject({
+      id: "item-2",
+      title: "See the Northern Lights",
+      distance: 0,
+      similarity: 1,
+    });
+  });
+
+  it("matches aurora borealis against northern lights", async () => {
+    mockExecute.mockResolvedValueOnce([
+      { id: "item-2", title: "See the Northern Lights" },
+    ] as never);
+    const result = await findTitleDuplicate(USER_ID, "Experience aurora borealis");
+    expect(result?.id).toBe("item-2");
   });
 });

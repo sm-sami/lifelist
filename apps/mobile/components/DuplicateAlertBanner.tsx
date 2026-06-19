@@ -1,6 +1,6 @@
 import type { DuplicateMatch } from "@/lib/api/items";
 import { useTheme } from "@/lib/useTheme";
-import { AlertCircle } from "lucide-react-native";
+import { Sparkles } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInUp, FadeOutUp } from "react-native-reanimated";
 
@@ -11,53 +11,146 @@ interface Props {
 }
 
 export function DuplicateAlertBanner({ match, onViewExisting, onAddAnyway }: Props) {
-  const { colors, radius } = useTheme();
+  const { colors, palette, radius, type } = useTheme();
+  const similarity = Math.round(match.similarity * 100);
+
   return (
     <Animated.View
       entering={FadeInUp.springify()}
       exiting={FadeOutUp}
-      style={[styles.banner, { borderRadius: radius.md }]}
+      style={[
+        styles.banner,
+        {
+          backgroundColor: colors.surfaceGlass,
+          borderColor: colors.borderGlass,
+          borderRadius: radius.lg,
+        },
+      ]}
     >
-      <View style={styles.row}>
-        <AlertCircle size={20} color={colors.danger} />
-        <Text style={[styles.text, { color: colors.textPrimary }]}>
-          Looks like <Text style={styles.bold}>"{match.title}"</Text> is already on your list{"  "}
-          <Text style={[styles.sim, { color: colors.danger }]}>
-            {Math.round(match.similarity * 100)}% match
+      <View style={styles.headerRow}>
+        <View
+          style={[
+            styles.iconWrap,
+            {
+              backgroundColor: colors.surfaceTint,
+              borderColor: colors.borderGlass,
+              borderRadius: radius.md,
+            },
+          ]}
+        >
+          <Sparkles size={18} color={colors.accentText} />
+        </View>
+        <View style={styles.copy}>
+          <View style={styles.titleRow}>
+            <Text style={[type.headingSmall, { color: colors.textPrimary }]}>
+              Already on your list
+            </Text>
+            <View
+              style={[
+                styles.matchPill,
+                {
+                  backgroundColor: colors.surfaceTint,
+                  borderColor: colors.borderGlass,
+                  borderRadius: radius.pill,
+                },
+              ]}
+            >
+              <Text style={[type.tag, { color: colors.accentText }]}>{similarity}% match</Text>
+            </View>
+          </View>
+          <Text style={[type.label, styles.text, { color: colors.textSecondary }]}>
+            “{match.title}” looks very similar to this one.
           </Text>
-        </Text>
+        </View>
       </View>
       <View style={styles.actions}>
         <Pressable
-          style={[styles.btn, styles.ghost, { borderColor: colors.borderGlass }]}
+          style={[
+            styles.btn,
+            styles.primary,
+            {
+              backgroundColor: colors.accent,
+              borderRadius: radius.md,
+            },
+          ]}
           onPress={() => onViewExisting(match.id)}
         >
-          <Text style={[styles.ghostText, { color: colors.textSecondary }]}>View existing</Text>
+          <Text style={[type.cta, { color: palette.white }]}>View existing</Text>
         </Pressable>
-        <Pressable style={[styles.btn, { backgroundColor: colors.danger }]} onPress={onAddAnyway}>
-          <Text style={styles.solidText}>Add anyway</Text>
+        <Pressable
+          style={[
+            styles.btn,
+            styles.secondary,
+            {
+              borderColor: colors.borderGlass,
+              borderRadius: radius.md,
+            },
+          ]}
+          onPress={onAddAnyway}
+        >
+          <Text style={[type.cta, { color: colors.textSecondary }]}>Add anyway</Text>
         </Pressable>
       </View>
+      <Text style={[type.tag, styles.footnote, { color: colors.textSecondary }]}>
+        You can still add it if this is meaningfully different.
+      </Text>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   banner: {
-    backgroundColor: "rgba(248,113,113,0.12)",
-    borderColor: "rgba(248,113,113,0.4)",
     borderWidth: 1,
     padding: 14,
-    marginTop: 12,
-    gap: 12,
+    marginTop: 14,
+    gap: 14,
   },
-  row: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
-  text: { flex: 1, lineHeight: 20 },
-  bold: { fontWeight: "700" },
-  sim: { fontWeight: "700" },
-  actions: { flexDirection: "row", gap: 10, justifyContent: "flex-end" },
-  btn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
-  ghost: { borderWidth: 1 },
-  ghostText: { fontWeight: "600" },
-  solidText: { color: "#fff", fontWeight: "700" },
+  headerRow: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "flex-start",
+  },
+  iconWrap: {
+    width: 38,
+    height: 38,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  copy: { flex: 1, minWidth: 0 },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  matchPill: {
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  text: {
+    marginTop: 5,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  btn: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primary: {
+    flex: 1.1,
+  },
+  secondary: {
+    flex: 0.9,
+    borderWidth: 1,
+  },
+  footnote: {
+    lineHeight: 15,
+  },
 });

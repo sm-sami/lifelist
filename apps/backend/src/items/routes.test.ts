@@ -14,7 +14,7 @@ vi.mock("../../db/client", () => ({
   },
 }));
 vi.mock("../ai/embed", () => ({ embed: vi.fn(), EMBEDDING_MODEL: "text-embedding-3-small" }));
-vi.mock("../ai/dedup", () => ({ findSemanticDuplicate: vi.fn() }));
+vi.mock("../ai/dedup", () => ({ findSemanticDuplicate: vi.fn(), findTitleDuplicate: vi.fn() }));
 vi.mock("../middleware/rate-limit", () => ({
   rateLimit: () => async (_c: unknown, next: () => Promise<void>) => next(),
 }));
@@ -29,7 +29,7 @@ vi.mock("@vercel/functions", () => ({ waitUntil: vi.fn() }));
 // ── Import mocked modules ─────────────────────────────────────────────────────
 const { db } = await import("../../db/client");
 const { embed } = await import("../ai/embed");
-const { findSemanticDuplicate } = await import("../ai/dedup");
+const { findSemanticDuplicate, findTitleDuplicate } = await import("../ai/dedup");
 const { toItemDto, storedImageExists, deleteStoredImage } = await import("./dto");
 const { enrichItem } = await import("./enrich");
 const { itemsRoutes } = await import("./routes");
@@ -39,6 +39,7 @@ const { itemsRoutes } = await import("./routes");
 const anyDb = db as any;
 const mockEmbed = vi.mocked(embed);
 const mockDedup = vi.mocked(findSemanticDuplicate);
+const mockTitleDedup = vi.mocked(findTitleDuplicate);
 const mockToItemDto = vi.mocked(toItemDto);
 const mockStoredImageExists = vi.mocked(storedImageExists);
 const mockDeleteStoredImage = vi.mocked(deleteStoredImage);
@@ -118,6 +119,7 @@ beforeEach(() => {
 describe("POST /api/items/create", () => {
   it("creates an item and returns 201", async () => {
     mockEmbed.mockResolvedValueOnce(FAKE_EMBEDDING);
+    mockTitleDedup.mockResolvedValueOnce(null);
     mockDedup.mockResolvedValueOnce(null);
     anyDb.transaction.mockImplementationOnce(
       async (fn: (tx: unknown) => Promise<typeof FAKE_ITEM>) => fn(fakeInsertTx()),
@@ -139,6 +141,7 @@ describe("POST /api/items/create", () => {
   it("returns 409 when a semantic duplicate is found", async () => {
     mockEmbed.mockResolvedValueOnce(FAKE_EMBEDDING);
     anyDb.transaction.mockImplementationOnce(async (fn: (tx: unknown) => Promise<void>) => {
+      mockTitleDedup.mockResolvedValueOnce(null);
       mockDedup.mockResolvedValueOnce(FAKE_DUP);
       return fn({ execute: vi.fn(), insert: vi.fn() });
     });
@@ -173,6 +176,30 @@ describe("POST /api/items/create", () => {
     expect(mockDedup).not.toHaveBeenCalled();
   });
 
+  it("returns 409 when a canonical title duplicate is found", async () => {
+    mockEmbed.mockResolvedValueOnce(FAKE_EMBEDDING);
+    anyDb.transaction.mockImplementationOnce(async (fn: (tx: unknown) => Promise<void>) => {
+      mockTitleDedup.mockResolvedValueOnce({
+        ...FAKE_DUP,
+        title: "See the Northern Lights",
+        distance: 0,
+        similarity: 1,
+      });
+      return fn({ execute: vi.fn(), insert: vi.fn() });
+    });
+
+    const res = await makeApp().request("/api/items/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Northern lights" }),
+    });
+
+    expect(res.status).toBe(409);
+    expect(mockDedup).not.toHaveBeenCalled();
+    const body = await res.json();
+    expect(body.match.title).toBe("See the Northern Lights");
+  });
+
   it("returns 400 for an empty title", async () => {
     const res = await makeApp().request("/api/items/create", {
       method: "POST",
@@ -186,6 +213,7 @@ describe("POST /api/items/create", () => {
 // ── GET /api/items/precheck ────────────────────────────────────────────────────
 describe("GET /api/items/precheck", () => {
   it("returns 200 with isDuplicate:false when no match", async () => {
+    mockTitleDedup.mockResolvedValueOnce(null);
     mockEmbed.mockResolvedValueOnce(FAKE_EMBEDDING);
     mockDedup.mockResolvedValueOnce(null);
 
@@ -196,6 +224,7 @@ describe("GET /api/items/precheck", () => {
   });
 
   it("returns 409 with match when a duplicate exists", async () => {
+    mockTitleDedup.mockResolvedValueOnce(null);
     mockEmbed.mockResolvedValueOnce(FAKE_EMBEDDING);
     mockDedup.mockResolvedValueOnce(FAKE_DUP);
 
@@ -203,6 +232,22 @@ describe("GET /api/items/precheck", () => {
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.match.id).toBe("item-000");
+  });
+
+  it("returns 409 from precheck when a canonical title duplicate exists", async () => {
+    mockTitleDedup.mockResolvedValueOnce({
+      ...FAKE_DUP,
+      title: "See the Northern Lights",
+      distance: 0,
+      similarity: 1,
+    });
+
+    const res = await makeApp().request("/api/items/precheck?title=Northern+lights");
+    expect(res.status).toBe(409);
+    expect(mockEmbed).not.toHaveBeenCalled();
+    expect(mockDedup).not.toHaveBeenCalled();
+    const body = await res.json();
+    expect(body.match.title).toBe("See the Northern Lights");
   });
 });
 
@@ -256,6 +301,58 @@ describe("PATCH /api/items/:id/complete", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.item.status).toBe("completed");
+  });
+});
+
+// ── DELETE /api/items/:id ─────────────────────────────────────────────────────
+describe("DELETE /api/items/:id", () => {
+  it("deletes the owned item and removes a stored image path", async () => {
+    const storedPath = "user-001/item-001/photo.jpg";
+    anyDb.transaction.mockImplementationOnce(
+      async (fn: (tx: unknown) => Promise<string | null | undefined>) => {
+        const fakeTx = {
+          select: vi.fn().mockReturnValue({
+            from: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                for: vi.fn().mockResolvedValue([{ imageUrl: storedPath }]),
+              }),
+            }),
+          }),
+          delete: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue(undefined),
+          }),
+        };
+        return fn(fakeTx);
+      },
+    );
+    mockDeleteStoredImage.mockResolvedValueOnce(undefined);
+
+    const res = await makeApp("user-001").request("/api/items/item-001", { method: "DELETE" });
+
+    expect(res.status).toBe(204);
+    expect(mockDeleteStoredImage).toHaveBeenCalledWith(storedPath);
+  });
+
+  it("returns 404 when the item is not owned or does not exist", async () => {
+    anyDb.transaction.mockImplementationOnce(
+      async (fn: (tx: unknown) => Promise<string | null | undefined>) => {
+        const fakeTx = {
+          select: vi.fn().mockReturnValue({
+            from: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                for: vi.fn().mockResolvedValue([]),
+              }),
+            }),
+          }),
+        };
+        return fn(fakeTx);
+      },
+    );
+
+    const res = await makeApp("user-001").request("/api/items/missing", { method: "DELETE" });
+
+    expect(res.status).toBe(404);
+    expect(mockDeleteStoredImage).not.toHaveBeenCalled();
   });
 });
 

@@ -11,6 +11,13 @@ export async function completeItem(itemId: string): Promise<ItemDto> {
   return CompleteResponseSchema.parse(body).item;
 }
 
+export async function deleteItem(itemId: string): Promise<void> {
+  const res = await apiFetch(`/items/${itemId}`, { method: "DELETE" });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`Delete item failed: ${res.status}`);
+  }
+}
+
 export interface DuplicateMatch {
   id: string;
   title: string;

@@ -18,22 +18,24 @@ vi.stubEnv("OPENAI_API_KEY", "test-key");
 const { normalizeTitle, embed } = await import("./embed");
 
 describe("normalizeTitle", () => {
-  it("lowercases and trims", () => {
-    expect(normalizeTitle("  Visit PARIS  ")).toBe("visit paris");
+  it("lowercases, trims, and removes leading bucket-list intent", () => {
+    expect(normalizeTitle("  Visit PARIS  ")).toBe("paris");
   });
 
-  it("collapses internal whitespace", () => {
-    expect(normalizeTitle("see  the   northern   lights")).toBe("see the northern lights");
+  it("collapses known aliases before embedding", () => {
+    expect(normalizeTitle("see  the   northern   lights")).toBe("northern lights");
+    expect(normalizeTitle("Experience aurora borealis")).toBe("northern lights");
+    expect(normalizeTitle("Visit the tallest building")).toBe("burj khalifa");
   });
 
   it("strips trailing punctuation", () => {
-    expect(normalizeTitle("Climb Everest!")).toBe("climb everest");
-    expect(normalizeTitle("Travel to Japan.")).toBe("travel to japan");
+    expect(normalizeTitle("Climb Everest!")).toBe("everest");
+    expect(normalizeTitle("Travel to Japan.")).toBe("japan");
     expect(normalizeTitle("Run a marathon?")).toBe("run a marathon");
   });
 
-  it("does not strip mid-sentence punctuation", () => {
-    expect(normalizeTitle("St. Moritz")).toBe("st. moritz");
+  it("removes punctuation for embedding stability", () => {
+    expect(normalizeTitle("St. Moritz")).toBe("st moritz");
   });
 });
 
@@ -56,6 +58,6 @@ describe("embed", () => {
   it("normalizes the input before embedding", async () => {
     await embed("  CLIMB Everest!  ");
     const callArg = mockCreate.mock.calls.at(-1)?.[0] as { input: string };
-    expect(callArg.input).toBe("climb everest");
+    expect(callArg.input).toBe("everest");
   });
 });

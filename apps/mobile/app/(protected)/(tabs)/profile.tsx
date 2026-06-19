@@ -1,7 +1,7 @@
+import { InitialsAvatar } from "@/components/InitialsAvatar";
 import { useMeData } from "@/hooks/useMeData";
 import { useAuth } from "@/lib/auth";
 import { useTheme, useThemeMode } from "@/lib/useTheme";
-import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Check, ChevronLeft, LogOut, Moon, Smartphone, Sun } from "lucide-react-native";
 import type React from "react";
@@ -20,10 +20,6 @@ const THEME_OPTIONS: {
   { value: "dark", label: "Dark", Icon: Moon },
 ];
 
-function dicebearUrl(userId: string) {
-  return `https://api.dicebear.com/9.x/thumbs/png?seed=${encodeURIComponent(userId)}&backgroundType=gradientLinear`;
-}
-
 export default function Profile() {
   const { colors, type, radius, space } = useTheme();
   const { mode, setMode } = useThemeMode();
@@ -33,9 +29,7 @@ export default function Profile() {
   const meData = useMeData();
 
   const email = session?.user?.email ?? "";
-  const userId = session?.user?.id ?? "";
   const displayName = meData?.displayName ?? email.split("@")[0];
-  const avatarSrc = meData?.avatarUrl ?? dicebearUrl(userId);
 
   return (
     <View
@@ -69,13 +63,7 @@ export default function Profile() {
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.avatarWrap}>
-          <Image
-            source={{ uri: avatarSrc }}
-            style={styles.avatar}
-            contentFit="cover"
-            transition={200}
-            accessibilityLabel="Your avatar"
-          />
+          <InitialsAvatar avatarUrl={meData?.avatarUrl} displayName={displayName} size={80} />
         </View>
         <Text style={[type.headingRegular, { color: colors.textPrimary, marginTop: space[4] }]}>
           {displayName}
@@ -199,8 +187,7 @@ const styles = StyleSheet.create({
   },
   headerSpacer: { width: 40 },
   bottom: {},
-  avatarWrap: { width: 80, height: 80, borderRadius: 40, overflow: "hidden" },
-  avatar: { width: 80, height: 80 },
+  avatarWrap: {},
   section: { width: "100%", borderWidth: 1, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14 },
 });

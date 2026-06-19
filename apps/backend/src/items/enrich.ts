@@ -2,6 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../../db/client";
 import { categories, items } from "../../db/schema";
 import { classifyItem } from "../ai/classify";
+import { getDeterministicItemMetadata } from "../ai/title";
 import { generateGradient, slugify } from "../services/gradient";
 import { broadcastItemEnriched } from "../services/realtime";
 import { searchPortraitImage, triggerUnsplashDownload } from "../services/unsplash";
@@ -25,10 +26,14 @@ async function resolveCategory(
     title,
     existingCategories: existing.map((c) => ({ id: c.id, name: c.name })),
   });
+  const deterministic = getDeterministicItemMetadata(title);
   const metadata = {
-    keywords: result.imageKeywords,
-    experienceSearchQuery: result.experienceSearchQuery,
-    experienceLocation: result.experienceLocation,
+    keywords: deterministic?.imageKeywords ?? result.imageKeywords,
+    experienceSearchQuery: deterministic?.experienceSearchQuery ?? result.experienceSearchQuery,
+    experienceLocation:
+      deterministic && "experienceLocation" in deterministic
+        ? (deterministic.experienceLocation ?? null)
+        : result.experienceLocation,
   };
 
   if (result.matchedCategoryId) {

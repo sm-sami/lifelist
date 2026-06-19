@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../../db/client";
 import { EMBEDDING_MODEL } from "./embed";
+import { canonicalizeBucketTitle } from "./title";
 
 const DISTANCE_MAX = Number(process.env.DEDUP_DISTANCE_MAX ?? "0.15");
 if (!Number.isFinite(DISTANCE_MAX) || DISTANCE_MAX <= 0 || DISTANCE_MAX >= 2) {
@@ -15,6 +16,31 @@ export interface DuplicateMatch {
 }
 
 type Executor = Pick<typeof db, "execute">;
+
+export async function findTitleDuplicate(
+  userId: string,
+  title: string,
+  exec: Executor = db,
+): Promise<DuplicateMatch | null> {
+  const target = canonicalizeBucketTitle(title);
+  if (target.length < 3) return null;
+
+  const rows = await exec.execute<{ id: string; title: string }>(sql`
+    select i.id, i.title
+    from items i
+    where i.user_id = ${userId}
+  `);
+
+  const match = rows.find((row) => canonicalizeBucketTitle(row.title) === target);
+  if (!match) return null;
+
+  return {
+    id: match.id,
+    title: match.title,
+    distance: 0,
+    similarity: 1,
+  };
+}
 
 export async function findSemanticDuplicate(
   userId: string,

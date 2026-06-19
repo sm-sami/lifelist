@@ -5,6 +5,8 @@ describe("normalizeExperienceQuery", () => {
   it.each([
     ["Visit the Eiffel Tower", "Eiffel Tower"],
     ["See the Northern Lights", "Northern Lights"],
+    ["Experience aurora borealis", "Northern Lights"],
+    ["Visit the tallest building", "Burj Khalifa"],
     ["Hike the Inca Trail", "Inca Trail"],
     ["Take a gondola ride in Venice", "gondola ride Venice"],
     ["I want to learn to surf in Bali", "surf Bali"],

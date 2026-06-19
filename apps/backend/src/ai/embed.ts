@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { canonicalizeBucketTitle } from "./title";
 
 function requireEnv(name: string): string {
   const v = process.env[name];
@@ -13,11 +14,7 @@ const EXPECTED_DIMS = 1536;
 const openai = new OpenAI({ apiKey: requireEnv("OPENAI_API_KEY") });
 
 export function normalizeTitle(title: string): string {
-  return title
-    .trim()
-    .replace(/\s+/g, " ")
-    .replace(/[.!?]+$/g, "")
-    .toLowerCase();
+  return canonicalizeBucketTitle(title);
 }
 
 export async function embed(text: string): Promise<number[]> {

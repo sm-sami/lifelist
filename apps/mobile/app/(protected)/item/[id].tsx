@@ -3,6 +3,7 @@ import { HoldToStampButton } from "@/components/HoldToStampButton";
 import { ParallaxScrollView } from "@/components/ParallaxScrollView";
 import { EmptyIllustration, ErrorIllustration } from "@/components/SheetIllustration";
 import { useExperiences } from "@/hooks/useExperiences";
+import { deleteItem } from "@/lib/api/items";
 import { useTheme } from "@/lib/useTheme";
 import { useItem, useItemsStore } from "@/store/items";
 import BottomSheet, {
@@ -11,9 +12,9 @@ import BottomSheet, {
   useBottomSheetSpringConfigs,
 } from "@gorhom/bottom-sheet";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, CloudOff, Search } from "lucide-react-native";
+import { ChevronLeft, CloudOff, Search, Trash2 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Resolve = "loading" | "ready" | "notfound" | "error";
@@ -25,6 +26,7 @@ export default function ItemDetail() {
   const { colors, radius } = useTheme();
   const item = useItem(id);
   const fetchItemById = useItemsStore((s) => s.fetchItemById);
+  const removeItem = useItemsStore((s) => s.remove);
   const sheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ["18%", "85%"], []);
   const sheetAnimation = useBottomSheetSpringConfigs({
@@ -35,6 +37,7 @@ export default function ItemDetail() {
   });
 
   const [resolve, setResolve] = useState<Resolve>(item ? "ready" : "loading");
+  const [deleting, setDeleting] = useState(false);
   const loadGeneration = useRef(0);
 
   const load = useCallback(async () => {
@@ -66,6 +69,28 @@ export default function ItemDetail() {
   } = useExperiences(item?.experienceSearchQuery ?? item?.title ?? "", item?.experienceLocation);
 
   const isCompleted = item?.status === "completed";
+
+  const requestDelete = useCallback(() => {
+    if (!item || deleting) return;
+    Alert.alert("Delete this item?", `"${item.title}" will be removed from your Lifelist.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          setDeleting(true);
+          try {
+            await deleteItem(item.id);
+            removeItem(item.id);
+            router.back();
+          } catch {
+            Alert.alert("Couldn't delete item", "Check your connection and try again.");
+            setDeleting(false);
+          }
+        },
+      },
+    ]);
+  }, [deleting, item, removeItem, router]);
 
   const gradient = useMemo<readonly [string, string]>(
     () => [
@@ -173,14 +198,33 @@ export default function ItemDetail() {
         imageUrl={item.imageUrl}
         gradient={gradient}
         headerOverlay={
-          <Pressable
-            onPress={() => router.back()}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            style={[styles.back, { top: insets.top + 8 }]}
-          >
-            <ChevronLeft size={24} color="#fff" />
-          </Pressable>
+          <>
+            <Pressable
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              style={[styles.heroIcon, styles.backIcon, { top: insets.top + 8 }]}
+            >
+              <ChevronLeft size={24} color="#fff" />
+            </Pressable>
+            <Pressable
+              onPress={requestDelete}
+              disabled={deleting}
+              accessibilityRole="button"
+              accessibilityLabel="Delete this Lifelist item"
+              style={[
+                styles.heroIcon,
+                styles.deleteIcon,
+                { top: insets.top + 8, opacity: deleting ? 0.65 : 1 },
+              ]}
+            >
+              {deleting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Trash2 size={20} color="#fff" />
+              )}
+            </Pressable>
+          </>
         }
       >
         {item.category?.name ? (
@@ -293,9 +337,8 @@ const styles = StyleSheet.create({
   notFoundBtn: { marginTop: 12, paddingHorizontal: 22, paddingVertical: 12, borderWidth: 1 },
   notFoundBtnText: { fontSize: 15, fontWeight: "700" },
   errActions: { flexDirection: "row", gap: 12, marginTop: 12 },
-  back: {
+  heroIcon: {
     position: "absolute",
-    left: 16,
     zIndex: 10,
     width: 40,
     height: 40,
@@ -304,6 +347,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  backIcon: { left: 16 },
+  deleteIcon: { right: 16 },
   chip: { fontWeight: "800", fontSize: 11, letterSpacing: 1.4, marginBottom: 8 },
   title: { fontSize: 28, fontWeight: "800", lineHeight: 34 },
   notes: { fontSize: 15, lineHeight: 22, marginTop: 12 },

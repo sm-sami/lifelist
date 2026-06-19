@@ -5,7 +5,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../../db/client";
 import { items } from "../../db/schema";
-import { findSemanticDuplicate } from "../ai/dedup";
+import { findSemanticDuplicate, findTitleDuplicate } from "../ai/dedup";
 import { EMBEDDING_MODEL, embed } from "../ai/embed";
 import { DuplicateItemError } from "../ai/errors";
 import { rateLimit } from "../middleware/rate-limit";
@@ -39,7 +39,9 @@ itemsRoutes.post("/create", zValidator("json", createSchema), async (c) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${userId}))`);
 
     if (!force) {
-      const dup = await findSemanticDuplicate(userId, queryEmbedding, tx);
+      const dup =
+        (await findTitleDuplicate(userId, title, tx)) ??
+        (await findSemanticDuplicate(userId, queryEmbedding, tx));
       if (dup) throw new DuplicateItemError(dup);
     }
 
@@ -67,6 +69,17 @@ const precheckSchema = z.object({ title: z.string().trim().min(1).max(140) });
 itemsRoutes.get("/precheck", zValidator("query", precheckSchema), async (c) => {
   const userId = c.get("userId");
   const { title } = c.req.valid("query");
+  const titleDup = await findTitleDuplicate(userId, title);
+  if (titleDup) {
+    return c.json(
+      {
+        error: "duplicate_item",
+        match: { id: titleDup.id, title: titleDup.title, similarity: titleDup.similarity },
+      },
+      409,
+    );
+  }
+
   const queryEmbedding = await embed(title);
   const dup = await findSemanticDuplicate(userId, queryEmbedding);
   if (dup) {
@@ -168,4 +181,26 @@ itemsRoutes.patch("/:id/image", zValidator("json", imageSchema), async (c) => {
   });
   if (!row) return c.json({ error: "not_found" }, 404);
   return c.json({ item: await toItemDto(row, row.category ?? null) });
+});
+
+itemsRoutes.delete("/:id", async (c) => {
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+
+  const previousPath = await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ imageUrl: items.imageUrl })
+      .from(items)
+      .where(and(eq(items.id, id), eq(items.userId, userId)))
+      .for("update");
+    if (!current) return undefined;
+
+    await tx.delete(items).where(and(eq(items.id, id), eq(items.userId, userId)));
+    return current.imageUrl;
+  });
+
+  if (previousPath === undefined) return c.json({ error: "not_found" }, 404);
+  await deleteStoredImage(previousPath);
+
+  return c.body(null, 204);
 });

@@ -34,6 +34,74 @@ export function EmptyIllustration() {
   );
 }
 
+export function FilterEmptyIllustration() {
+  const { colors } = useTheme();
+  const dim = colors.textSecondary;
+  const accent = colors.accent;
+
+  return (
+    <Svg width={112} height={112} viewBox="0 0 112 112">
+      <G opacity={0.9}>
+        {/* Funnel / filter shape */}
+        <Path
+          d="M18 26 L46 58 L46 84 L66 74 L66 58 L94 26 Z"
+          stroke={dim}
+          strokeWidth={2}
+          fill="none"
+          strokeOpacity={0.35}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {/* Horizontal lines inside funnel (filter slots) */}
+        <Line
+          x1={28}
+          y1={38}
+          x2={84}
+          y2={38}
+          stroke={dim}
+          strokeWidth={1.5}
+          strokeOpacity={0.25}
+          strokeLinecap="round"
+        />
+        <Line
+          x1={36}
+          y1={48}
+          x2={76}
+          y2={48}
+          stroke={dim}
+          strokeWidth={1.5}
+          strokeOpacity={0.2}
+          strokeLinecap="round"
+        />
+        {/* Accent dot — the "nothing matched" indicator */}
+        <Circle cx={56} cy={70} r={7} fill={accent} opacity={0.15} />
+        <Circle cx={56} cy={70} r={4} fill={accent} opacity={0.6} />
+        {/* Small cross over the dot */}
+        <Line
+          x1={53}
+          y1={67}
+          x2={59}
+          y2={73}
+          stroke={accent}
+          strokeWidth={1.8}
+          strokeLinecap="round"
+          opacity={0.9}
+        />
+        <Line
+          x1={59}
+          y1={67}
+          x2={53}
+          y2={73}
+          stroke={accent}
+          strokeWidth={1.8}
+          strokeLinecap="round"
+          opacity={0.9}
+        />
+      </G>
+    </Svg>
+  );
+}
+
 export function ErrorIllustration() {
   const { colors } = useTheme();
   const dim = colors.textSecondary;
