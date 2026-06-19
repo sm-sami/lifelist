@@ -4,6 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import { DuplicateItemError } from "./ai/errors";
 import { authMiddleware } from "./auth/middleware";
+import { experiencesRoutes } from "./experiences/routes";
 import { itemsRoutes } from "./items/routes";
 import type { AppEnv } from "./types";
 
@@ -26,6 +27,7 @@ app.use("/api/*", authMiddleware);
 app.get("/api/me", (c) => c.json({ userId: c.get("userId"), email: c.get("userEmail") }));
 
 app.route("/api/items", itemsRoutes);
+app.route("/api/experiences", experiencesRoutes);
 
 app.onError((err, c) => {
   if (err instanceof DuplicateItemError) {

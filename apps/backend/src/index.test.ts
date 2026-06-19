@@ -8,6 +8,7 @@ vi.mock("./auth/verify-token", () => ({
 // Items routes pull in embed (throws without OPENAI_API_KEY), supabase clients, etc.
 // Replace with an empty Hono-compatible stub so index.test stays focused on auth middleware.
 vi.mock("./items/routes", () => ({ itemsRoutes: { routes: [] } }));
+vi.mock("./experiences/routes", () => ({ experiencesRoutes: { routes: [] } }));
 
 import { verifySupabaseToken } from "./auth/verify-token";
 import app from "./index";
