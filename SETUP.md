@@ -12,7 +12,7 @@ or `.env.local` files.
 
 Create or confirm access to:
 
-- **Supabase** — use separate projects for development and production.
+- **Supabase** — use the CLI stack locally and one hosted production project.
 - **Vercel** — hosts the Hono backend using the Node.js runtime.
 - **OpenAI API** — embeddings and item classification. Add billing and a conservative
   project budget before testing.
@@ -33,6 +33,8 @@ Install:
 - Git
 - Node.js `>=20.19 <27`
 - pnpm `10.33.0`
+- Supabase CLI
+- Docker Desktop, OrbStack, or another Docker-compatible runtime
 - Xcode and an iOS Simulator for iOS development (macOS only)
 - Android Studio, Android SDK, and an emulator for Android development
 
@@ -53,19 +55,32 @@ with Node or require it.
 Use pnpm only. Native Expo dependencies must be installed from `apps/mobile` or with the
 mobile workspace filter so Expo selects SDK-compatible versions.
 
-## 3. Supabase projects
+## 3. Supabase environments
 
-Create two projects:
+Lifelist uses two isolated environments:
 
 | Environment | Purpose |
 | --- | --- |
-| Development | Local backend, simulators/devices, test data |
+| Local | Supabase CLI containers, local backend, simulators/devices, test data |
 | Production | Live personal data and the production backend |
 
-Choose a region close to the corresponding Vercel deployment. Save each database
-password in a password manager.
+Start the repository's local stack:
 
-For each project, collect:
+```bash
+pnpm supabase:start
+pnpm supabase:status
+```
+
+The first start downloads the container images and can take several minutes. Supabase
+Studio is at `http://127.0.0.1:54323`, and captured development email is at
+`http://127.0.0.1:54324`. Stop the stack with `pnpm supabase:stop`.
+
+The ignored `apps/backend/.env.local` and `apps/mobile/.env.local` files contain the
+generated local credentials. If the local keys change, retrieve the current values with
+`supabase status -o env` and update those files.
+
+For production, choose a region close to the Vercel deployment and save the database
+password in a password manager. Collect:
 
 - Project URL
 - Publishable key (or legacy anon key)
@@ -83,7 +98,7 @@ pooler on port `5432` for migrations or enable Supabase's IPv4 add-on.
 
 ### Supabase configuration
 
-For each environment:
+For both local and production:
 
 1. Enable the `vector` extension through a committed migration.
 2. Apply committed Drizzle migrations, including RLS policies.
@@ -102,25 +117,25 @@ migration is applied.
 
 ## 4. Backend environment
 
-Copy the committed template, then replace every placeholder:
+The ignored local file is already configured for the Supabase CLI stack. To recreate it,
+copy the committed template and replace its placeholders using `supabase status -o env`:
 
 ```bash
 cp apps/backend/.env.example apps/backend/.env.local
 ```
 
-The local file has this shape:
+The local Supabase connection has this shape:
 
 ```bash
 # Supabase database
-DATABASE_URL="postgresql://postgres.<PROJECT_REF>:<DB_PASSWORD>@<POOLER_HOST>:6543/postgres"
-DIRECT_URL="postgresql://postgres:<DB_PASSWORD>@db.<PROJECT_REF>.supabase.co:5432/postgres"
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+DIRECT_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
 # Supabase API and JWT verification
-SUPABASE_URL="https://<PROJECT_REF>.supabase.co"
-SUPABASE_SERVICE_ROLE_KEY="<SERVER_ONLY_SERVICE_ROLE_KEY>"
-SUPABASE_JWT_ALG="ES256"
-# Only for legacy HS256 projects:
-# SUPABASE_JWT_SECRET="<LEGACY_JWT_SECRET>"
+SUPABASE_URL="http://127.0.0.1:54321"
+SUPABASE_SERVICE_ROLE_KEY="<LOCAL_SERVICE_ROLE_KEY>"
+SUPABASE_JWT_ALG="HS256"
+SUPABASE_JWT_SECRET="<LOCAL_JWT_SECRET>"
 
 # OpenAI
 OPENAI_API_KEY="<SERVER_ONLY_OPENAI_KEY>"
@@ -161,11 +176,12 @@ The mobile app needs only public client configuration:
 
 | Setting | Development value |
 | --- | --- |
-| `supabaseUrl` | Development Supabase project URL |
-| `supabaseAnonKey` | Development publishable/anon client key |
+| `supabaseUrl` | Local Supabase API URL |
+| `supabaseAnonKey` | Local publishable/anon client key |
 | `apiBaseUrl` | Local backend URL ending in `/api` |
 
-Copy the committed template, then replace every placeholder:
+The ignored local file is already configured. To recreate it, copy the committed
+template and use `supabase status -o env`:
 
 ```bash
 cp apps/mobile/.env.example apps/mobile/.env.local
@@ -174,8 +190,8 @@ cp apps/mobile/.env.example apps/mobile/.env.local
 The mobile variables are:
 
 ```bash
-EXPO_PUBLIC_SUPABASE_URL="https://<PROJECT_REF>.supabase.co"
-EXPO_PUBLIC_SUPABASE_ANON_KEY="<PUBLISHABLE_OR_LEGACY_ANON_KEY>"
+EXPO_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321"
+EXPO_PUBLIC_SUPABASE_ANON_KEY="<LOCAL_PUBLISHABLE_KEY>"
 EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:3000/api"
 ```
 
@@ -274,7 +290,7 @@ the development computer, use the computer's LAN address in `apiBaseUrl`; never 
 Before calling local setup complete, verify:
 
 - Backend health check responds.
-- The app signs in against the development Supabase project.
+- The app signs in against the local Supabase stack.
 - A protected Hono endpoint accepts the Supabase access token.
 - Migrations have enabled RLS and direct client writes outside the allowed policies fail.
 - An item can be created, enriched, completed, and reloaded.
@@ -293,9 +309,9 @@ Create a Vercel project for the backend:
 - Choose a deployment region near the production Supabase project.
 - Add a custom API domain if desired, for example `api.example.com`.
 
-Add all backend variables from section 4 to Vercel Production. Use development Supabase
-credentials for Vercel Development. Preview deployments should use a non-production
-database unless a preview-specific isolation strategy has been deliberately designed.
+Add the production backend variables to Vercel Production. Do not point Vercel
+Development or Preview deployments at production unless that risk has been explicitly
+accepted; local development uses the CLI stack.
 
 Do not run migrations automatically inside a serverless request. Apply committed
 migrations as an explicit release/CI step using `DIRECT_URL`, then deploy application
@@ -340,12 +356,12 @@ Any mobile environment configuration contains only:
 - Production API base URL
 
 Test the production backend and Supabase project carefully before pointing Expo Go at
-them. Prefer a separate development configuration during ordinary work so test data and
-mistakes cannot affect production data.
+them. Use the local CLI configuration during ordinary work so test data and mistakes
+cannot affect production data.
 
 ## 9. Production readiness checklist
 
-- [ ] Separate development and production Supabase projects
+- [x] Local Supabase CLI environment separated from production
 - [ ] Production database password and keys stored in a team password manager
 - [ ] RLS enabled and negative authorization tests passing
 - [ ] Private Storage bucket and owner policies applied by migration

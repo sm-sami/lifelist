@@ -23,6 +23,14 @@
     }
   },
   "files": {
-    "ignore": ["**/drizzle/**", "**/.expo/**", "**/node_modules/**", "**/dist/**", "**/coverage/**"]
+    "ignore": [
+      "**/drizzle/**",
+      "**/.expo/**",
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/coverage/**",
+      "supabase/.branches/**",
+      "supabase/.temp/**"
+    ]
   }
 }

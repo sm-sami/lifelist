@@ -13,6 +13,9 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "gate": "pnpm typecheck && pnpm lint && pnpm format:check",
+    "supabase:start": "supabase start",
+    "supabase:status": "supabase status",
+    "supabase:stop": "supabase stop",
     "prepare": "lefthook install"
   },
   "devDependencies": {
