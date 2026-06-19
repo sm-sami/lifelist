@@ -1,6 +1,14 @@
 import { ItemDtoSchema } from "@lifelist/shared";
 import type { ItemDto } from "@lifelist/shared";
-import { apiFetch } from "./client";
+import { z } from "zod";
+import { apiFetch, apiJson } from "./client";
+
+const CompleteResponseSchema = z.object({ item: ItemDtoSchema });
+
+export async function completeItem(itemId: string): Promise<ItemDto> {
+  const body = await apiJson<unknown>(`/items/${itemId}/complete`, { method: "PATCH" });
+  return CompleteResponseSchema.parse(body).item;
+}
 
 export interface DuplicateMatch {
   id: string;

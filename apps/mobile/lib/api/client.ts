@@ -12,3 +12,9 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
     },
   });
 }
+
+export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await apiFetch(path, init);
+  if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
+  return res.json() as Promise<T>;
+}
