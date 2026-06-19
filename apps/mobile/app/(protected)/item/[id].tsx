@@ -1,3 +1,4 @@
+import { ChangePhotoButton } from "@/components/ChangePhotoButton";
 import { ExperienceCard } from "@/components/ExperienceCard";
 import { HoldToStampButton } from "@/components/HoldToStampButton";
 import { ParallaxScrollView } from "@/components/ParallaxScrollView";
@@ -166,6 +167,8 @@ export default function ItemDetail() {
             {" on Unsplash"}
           </Text>
         ) : null}
+
+        <ChangePhotoButton itemId={item.id} />
 
         <HoldToStampButton itemId={item.id} completed={isCompleted} />
 

@@ -1,3 +1,4 @@
+import type { Item } from "@/store/types";
 import { ItemDtoSchema } from "@lifelist/shared";
 import type { ItemDto } from "@lifelist/shared";
 import { z } from "zod";
@@ -56,4 +57,12 @@ export async function createItem(
   if (!res.ok) return { ok: false, error: true };
   const body = await res.json();
   return { ok: true, item: ItemDtoSchema.parse(body.item) };
+}
+
+export async function setItemImage(itemId: string, imagePath: string): Promise<Item> {
+  const { item } = await apiJson<{ item: unknown }>(`/items/${itemId}/image`, {
+    method: "PATCH",
+    body: JSON.stringify({ imagePath }),
+  });
+  return ItemDtoSchema.parse(item);
 }

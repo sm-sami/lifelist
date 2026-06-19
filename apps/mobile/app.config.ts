@@ -7,8 +7,15 @@ const config: ExpoConfig = {
   sdkVersion: "56.0.0",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
-  plugins: ["expo-router", "react-native-edge-to-edge"],
-  ios: { supportsTablet: true, bundleIdentifier: "com.lifelist.app" },
+  plugins: ["expo-router", "expo-image-picker", "react-native-edge-to-edge"],
+  ios: {
+    supportsTablet: true,
+    bundleIdentifier: "com.lifelist.app",
+    infoPlist: {
+      NSPhotoLibraryUsageDescription:
+        "Lifelist needs photo library access so you can attach custom photos to your items.",
+    },
+  },
   android: {
     package: "com.lifelist.app",
     // @ts-expect-error: edgeToEdgeEnabled is valid in SDK 56 but not yet in the bundled types
