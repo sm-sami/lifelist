@@ -17,7 +17,7 @@
 | backend/005 | Headout v3 search proxy | ✅ | mohamed.sami@headout.com | main | 2026-06-19 18:10 | live GET contract pinned 2026-06-19 |
 | frontend/001 | Expo Router scaffold + theming + Halyard | ✅ | mohamed.sami@headout.com | phase/frontend-001 | 2026-06-19 18:22 | Sora/HankenGrotesk fallback; Halyard flag off until licence confirmed |
 | frontend/002 | Dashboard grid + glass (Headout re-skin) | ✅ | mohamed.sami@headout.com | phase/frontend-002 | 2026-06-19 19:15 | FlashList v2 masonry; GlassContainer + DustyOverlay + ItemCard |
-| frontend/003 | Smart-Add overlay + debouncer | ⬜ | — | — | — | |
+| frontend/003 | Smart-Add overlay + debouncer | ✅ | mohamed.sami@headout.com | phase/frontend-003 | 2026-06-19 19:30 | |
 | frontend/004 | Item detail parallax + bottom sheet | ⬜ | — | — | — | |
 | frontend/005 | Celebration canvas + hold-to-stamp | ⬜ | — | — | — | |
 | integration/001 | Data-layer plumbing (JWT client + stores) | ⬜ | — | — | — | |

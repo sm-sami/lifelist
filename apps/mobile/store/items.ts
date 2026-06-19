@@ -10,10 +10,16 @@ export interface ItemsState {
   items: Item[];
   status: ItemsStatus;
   refetch: () => void;
+  addOptimistic: (item: Item) => void;
 }
 
 // Stub hook — returns empty list in loading state until integration/001.
 export function useItems<T>(selector: (s: ItemsState) => T): T {
-  const stub: ItemsState = { items: [], status: "loading", refetch: () => {} };
+  const stub: ItemsState = {
+    items: [],
+    status: "loading",
+    refetch: () => {},
+    addOptimistic: () => {},
+  };
   return selector(stub);
 }
