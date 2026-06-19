@@ -1,15 +1,11 @@
 import type { CategoryDto, ItemDto } from "@lifelist/shared";
-import { createClient } from "@supabase/supabase-js";
+import { makeAdminClient } from "../lib/supabase-admin";
 import type { Category, Item } from "../types";
 
 const MEDIA_BUCKET = "item-images";
 const SIGNED_URL_TTL = 3600;
 
-const storage = createClient(
-  process.env.SUPABASE_URL ?? "",
-  process.env.SUPABASE_SECRET_KEY ?? "",
-  { auth: { persistSession: false } },
-).storage;
+const storage = makeAdminClient().storage;
 
 export function toCategoryDto(c: Category): CategoryDto {
   return { id: c.id, name: c.name, gradientStart: c.gradientStart, gradientEnd: c.gradientEnd };

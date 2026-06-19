@@ -1,17 +1,11 @@
-import { createClient } from "@supabase/supabase-js";
+import { makeAdminClient } from "../lib/supabase-admin";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 if (!SUPABASE_URL) throw new Error("SUPABASE_URL is not set.");
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
 if (!SUPABASE_SECRET_KEY) throw new Error("SUPABASE_SECRET_KEY is not set.");
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-    detectSessionInUrl: false,
-  },
-});
+const supabase = makeAdminClient();
 
 export interface SupabaseJwtPayload {
   sub: string;

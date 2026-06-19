@@ -1,8 +1,6 @@
-import { createClient } from "@supabase/supabase-js";
+import { makeAdminClient } from "../lib/supabase-admin";
 
-const admin = createClient(process.env.SUPABASE_URL ?? "", process.env.SUPABASE_SECRET_KEY ?? "", {
-  auth: { persistSession: false },
-});
+const admin = makeAdminClient();
 
 export async function broadcastItemEnriched(userId: string, payload: unknown): Promise<void> {
   const channel = admin.channel(`user:${userId}`, {
