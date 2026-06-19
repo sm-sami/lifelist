@@ -1,0 +1,171 @@
+import { zValidator } from "@hono/zod-validator";
+import { waitUntil } from "@vercel/functions";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { Hono } from "hono";
+import { z } from "zod";
+import { db } from "../../db/client";
+import { items } from "../../db/schema";
+import { findSemanticDuplicate } from "../ai/dedup";
+import { EMBEDDING_MODEL, embed } from "../ai/embed";
+import { DuplicateItemError } from "../ai/errors";
+import { rateLimit } from "../middleware/rate-limit";
+import type { AppEnv } from "../types";
+import { deleteStoredImage, storedImageExists, toItemDto } from "./dto";
+import { enrichItem } from "./enrich";
+
+export const itemsRoutes = new Hono<AppEnv>();
+
+// Rate limiter must be registered BEFORE the handlers it wraps.
+itemsRoutes.use("/create", rateLimit({ max: 30, windowMs: 60_000 }));
+itemsRoutes.use("/precheck", rateLimit({ max: 30, windowMs: 60_000 }));
+
+const createSchema = z.object({
+  title: z.string().trim().min(1).max(140),
+  notes: z.string().trim().max(2000).optional(),
+  force: z.boolean().optional().default(false),
+});
+
+const imageSchema = z.object({
+  imagePath: z.string().trim().max(512),
+});
+
+itemsRoutes.post("/create", zValidator("json", createSchema), async (c) => {
+  const userId = c.get("userId");
+  const { title, notes, force } = c.req.valid("json");
+
+  const queryEmbedding = await embed(title);
+
+  const created = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${userId}))`);
+
+    if (!force) {
+      const dup = await findSemanticDuplicate(userId, queryEmbedding, tx);
+      if (dup) throw new DuplicateItemError(dup);
+    }
+
+    const [row] = await tx
+      .insert(items)
+      .values({
+        userId,
+        title,
+        notes: notes ?? null,
+        embedding: queryEmbedding,
+        embeddingModel: EMBEDDING_MODEL,
+        status: "pending_enrichment",
+      })
+      .returning();
+    return row;
+  });
+
+  waitUntil(enrichItem(userId, created.id, title));
+
+  return c.json({ item: await toItemDto(created, null) }, 201);
+});
+
+const precheckSchema = z.object({ title: z.string().trim().min(1).max(140) });
+
+itemsRoutes.get("/precheck", zValidator("query", precheckSchema), async (c) => {
+  const userId = c.get("userId");
+  const { title } = c.req.valid("query");
+  const queryEmbedding = await embed(title);
+  const dup = await findSemanticDuplicate(userId, queryEmbedding);
+  if (dup) {
+    return c.json(
+      {
+        error: "duplicate_item",
+        match: { id: dup.id, title: dup.title, similarity: dup.similarity },
+      },
+      409,
+    );
+  }
+  return c.json({ isDuplicate: false });
+});
+
+itemsRoutes.get("/", async (c) => {
+  const userId = c.get("userId");
+  const rows = await db.query.items.findMany({
+    where: eq(items.userId, userId),
+    with: { category: true },
+    orderBy: desc(items.createdAt),
+  });
+  return c.json({ items: await Promise.all(rows.map((r) => toItemDto(r, r.category ?? null))) });
+});
+
+itemsRoutes.get("/:id", async (c) => {
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+  const row = await db.query.items.findFirst({
+    where: and(eq(items.id, id), eq(items.userId, userId)),
+    with: { category: true },
+  });
+  if (!row) return c.json({ error: "not_found" }, 404);
+  return c.json({ item: await toItemDto(row, row.category ?? null) });
+});
+
+itemsRoutes.patch("/:id/complete", async (c) => {
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+  await db
+    .update(items)
+    .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(items.id, id), eq(items.userId, userId)));
+  const row = await db.query.items.findFirst({
+    where: and(eq(items.id, id), eq(items.userId, userId)),
+    with: { category: true },
+  });
+  if (!row) return c.json({ error: "not_found" }, 404);
+  return c.json({ item: await toItemDto(row, row.category ?? null) });
+});
+
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ALLOWED_EXT = /\.(?:jpe?g|png|webp)$/i;
+
+itemsRoutes.patch("/:id/image", zValidator("json", imageSchema), async (c) => {
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+  const { imagePath } = c.req.valid("json");
+
+  const expectedPrefix = `${userId}/${id}/`;
+  const filename = imagePath.slice(expectedPrefix.length);
+  const basename = filename.replace(ALLOWED_EXT, "");
+  if (
+    !imagePath.startsWith(expectedPrefix) ||
+    !UUID_V4.test(basename) ||
+    !ALLOWED_EXT.test(filename)
+  ) {
+    return c.json({ error: "invalid_image_path" }, 400);
+  }
+  if (!(await storedImageExists(imagePath))) {
+    return c.json({ error: "uploaded_image_not_found" }, 400);
+  }
+
+  const previousPath = await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ imageUrl: items.imageUrl })
+      .from(items)
+      .where(and(eq(items.id, id), eq(items.userId, userId)))
+      .for("update");
+    if (!current) return undefined;
+
+    await tx
+      .update(items)
+      .set({
+        imageUrl: imagePath,
+        imageAttribution: null,
+        imageAttributionUrl: null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(items.id, id), eq(items.userId, userId)));
+    return current.imageUrl;
+  });
+  if (previousPath === undefined) return c.json({ error: "not_found" }, 404);
+
+  if (previousPath !== imagePath) await deleteStoredImage(previousPath);
+
+  const row = await db.query.items.findFirst({
+    where: and(eq(items.id, id), eq(items.userId, userId)),
+    with: { category: true },
+  });
+  if (!row) return c.json({ error: "not_found" }, 404);
+  return c.json({ item: await toItemDto(row, row.category ?? null) });
+});

@@ -13,7 +13,7 @@
 | backend/001 | Supabase Postgres + Drizzle setup | ✅ | srmf2025@gmail.com | phase/backend-001 | 2026-06-19 11:22 | |
 | backend/002 | Supabase auth + Hono JWT middleware | ✅ | mohamed.sami@headout.com | phase/backend-002 | 2026-06-19 17:06 | |
 | backend/003 | AI embeddings + pgvector de-dup | ✅ | mohamed.sami@headout.com | phase/backend-003 | 2026-06-19 17:20 | |
-| backend/004 | LLM classify, gradient, Unsplash, /items/create | ⬜ | — | — | — | |
+| backend/004 | LLM classify, gradient, Unsplash, /items/create | ✅ | mohamed.sami@headout.com | main | 2026-06-19 18:00 | |
 | backend/005 | Headout v3 search proxy | ⬜ | — | — | — | live GET contract pinned 2026-06-19 |
 | frontend/001 | Expo Router scaffold + theming + Halyard | ⬜ | — | — | — | |
 | frontend/002 | Dashboard grid + glass (Headout re-skin) | ⬜ | — | — | — | |
