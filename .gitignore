@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment files — examples stay committed
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Expo / React Native generated state
+.expo/
+**/.expo/
+expo-env.d.ts
+**/expo-env.d.ts
+apps/mobile/.cache/
+apps/mobile/dist/
+apps/mobile/web-build/
+apps/mobile/ios/
+apps/mobile/android/
+
+# Backend / build output
+dist/
+**/dist/
+build/
+**/build/
+.vercel/
+**/.vercel/
+
+# Tests and tooling
+coverage/
+**/coverage/
+*.tsbuildinfo
+.turbo/
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tmp
+*.swp
+*.swo
+
+# Editor / OS metadata
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
