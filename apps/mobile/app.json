@@ -1,0 +1,3 @@
+{
+  "plugins": ["expo-router", "expo-image", "expo-font", "react-native-edge-to-edge"]
+}
