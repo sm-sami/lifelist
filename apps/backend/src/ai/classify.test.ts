@@ -28,11 +28,15 @@ describe("classifyItem", () => {
       matchedCategoryId: null,
       newCategoryName: "Travel",
       imageKeywords: ["mountain", "adventure"],
+      experienceSearchQuery: "Inca Trail",
+      experienceLocation: "Peru",
     });
     const result = await classifyItem({ title: "Hike the Inca Trail", existingCategories: [] });
     expect(result.matchedCategoryId).toBeNull();
     expect(result.newCategoryName).toBe("Travel");
     expect(result.imageKeywords).toHaveLength(2);
+    expect(result.experienceSearchQuery).toBe("Inca Trail");
+    expect(result.experienceLocation).toBe("Peru");
   });
 
   it("returns the matched category id when one fits", async () => {
@@ -40,6 +44,8 @@ describe("classifyItem", () => {
       matchedCategoryId: "cat-travel",
       newCategoryName: null,
       imageKeywords: ["paris", "eiffel"],
+      experienceSearchQuery: "Eiffel Tower",
+      experienceLocation: "Paris, France",
     });
     const result = await classifyItem({
       title: "Visit the Eiffel Tower",
@@ -54,6 +60,8 @@ describe("classifyItem", () => {
       matchedCategoryId: "does-not-exist",
       newCategoryName: null,
       imageKeywords: ["sky", "cloud"],
+      experienceSearchQuery: "Skydiving",
+      experienceLocation: null,
     });
     const result = await classifyItem({
       title: "Skydive",

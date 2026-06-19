@@ -46,6 +46,15 @@ describe("searchExperiences", () => {
     expect(url.searchParams.get("query")).toBe("Eiffel Tower");
   });
 
+  it("normalizes bucket-list intent before querying Headout", async () => {
+    mockFetch.mockResolvedValueOnce(okResponse(GOOD_RESPONSE));
+
+    await searchExperiences({ query: "Visit the Eiffel Tower", limit: 6 });
+
+    const [url] = mockFetch.mock.calls[0] as [URL];
+    expect(url.searchParams.get("query")).toBe("Eiffel Tower");
+  });
+
   it("returns cached result on second call without re-fetching", async () => {
     mockFetch.mockResolvedValueOnce(okResponse(GOOD_RESPONSE));
 

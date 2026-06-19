@@ -10,7 +10,12 @@ import { toItemDto } from "./dto";
 async function resolveCategory(
   userId: string,
   title: string,
-): Promise<{ categoryId: string; keywords: string[] }> {
+): Promise<{
+  categoryId: string;
+  keywords: string[];
+  experienceSearchQuery: string | null;
+  experienceLocation: string | null;
+}> {
   const existing = await db
     .select({ id: categories.id, name: categories.name, slug: categories.slug })
     .from(categories)
@@ -20,16 +25,21 @@ async function resolveCategory(
     title,
     existingCategories: existing.map((c) => ({ id: c.id, name: c.name })),
   });
+  const metadata = {
+    keywords: result.imageKeywords,
+    experienceSearchQuery: result.experienceSearchQuery,
+    experienceLocation: result.experienceLocation,
+  };
 
   if (result.matchedCategoryId) {
-    return { categoryId: result.matchedCategoryId, keywords: result.imageKeywords };
+    return { categoryId: result.matchedCategoryId, ...metadata };
   }
 
   const name = result.newCategoryName ?? "General";
   const slug = slugify(name) || "general";
 
   const dup = existing.find((c) => c.slug === slug);
-  if (dup) return { categoryId: dup.id, keywords: result.imageKeywords };
+  if (dup) return { categoryId: dup.id, ...metadata };
 
   const gradient = generateGradient(name);
   const [created] = await db
@@ -41,19 +51,26 @@ async function resolveCategory(
     })
     .returning({ id: categories.id });
 
-  return { categoryId: created.id, keywords: result.imageKeywords };
+  return { categoryId: created.id, ...metadata };
 }
 
 export async function enrichItem(userId: string, itemId: string, title: string): Promise<void> {
   try {
-    const { categoryId, keywords } = await resolveCategory(userId, title);
+    const { categoryId, keywords, experienceSearchQuery, experienceLocation } =
+      await resolveCategory(userId, title);
 
     const pick = await searchPortraitImage(keywords);
     if (pick) await triggerUnsplashDownload(pick.downloadLocation);
 
     await db
       .update(items)
-      .set({ categoryId, status: "active", updatedAt: new Date() })
+      .set({
+        categoryId,
+        experienceSearchQuery,
+        experienceLocation,
+        status: "active",
+        updatedAt: new Date(),
+      })
       .where(
         and(eq(items.id, itemId), eq(items.userId, userId), eq(items.status, "pending_enrichment")),
       );

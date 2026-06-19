@@ -61,6 +61,8 @@ export const items = pgTable(
     imageUrl: text("image_url"),
     imageAttribution: text("image_attribution"),
     imageAttributionUrl: text("image_attribution_url"),
+    experienceSearchQuery: text("experience_search_query"),
+    experienceLocation: text("experience_location"),
     status: text("status", {
       enum: ["pending_enrichment", "active", "completed"],
     })

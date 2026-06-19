@@ -13,13 +13,14 @@ experiencesRoutes.use("/", rateLimit({ max: 30, windowMs: 60_000 }));
 const querySchema = z.object({
   q: z.string().trim().min(1).max(120),
   city: z.string().trim().max(40).optional(),
+  location: z.string().trim().max(80).optional(),
   limit: z.coerce.number().int().min(1).max(20).optional().default(6),
 });
 
 experiencesRoutes.get("/", zValidator("query", querySchema), async (c) => {
-  const { q, city, limit } = c.req.valid("query");
+  const { q, city, location, limit } = c.req.valid("query");
   try {
-    const experiences = await searchExperiences({ query: q, city, limit });
+    const experiences = await searchExperiences({ query: q, city, location, limit });
     const body = ExperiencesResponseSchema.parse({
       query: q,
       count: experiences.length,

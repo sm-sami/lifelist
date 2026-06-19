@@ -13,6 +13,8 @@ export interface ClassifyResult {
   matchedCategoryId: string | null;
   newCategoryName: string | null;
   imageKeywords: string[];
+  experienceSearchQuery: string | null;
+  experienceLocation: string | null;
 }
 
 const SYSTEM_PROMPT = `You are the categorization engine for "Lifelist", a bucket-list app.
@@ -27,6 +29,14 @@ Given a single bucket-list item title and the user's EXISTING categories, you mu
    "Outdoor Adventure"). Prefer broad buckets over narrow ones to avoid sprawl.
 4. Always return "imageKeywords": 2-4 short, concrete, visually evocative search terms
    for a background photo (e.g. ["machu picchu","sunrise","peru"]). No abstract words.
+5. Return "experienceSearchQuery" as a concise 1-5 word commercial activity, attraction,
+   or landmark query suitable for a travel-experience search engine. Remove bucket-list
+   intent such as "visit", "see", "go to", "experience", "take a", and "I want to".
+   Preserve meaningful activity words such as "surfing", "cooking class", or "skydiving".
+   Use null only when no meaningful bookable experience query can be derived.
+6. Return "experienceLocation" as the city, region, or country explicitly stated or
+   unambiguously implied by a named landmark (e.g. "Paris, France" for Eiffel Tower).
+   Otherwise return null. Do not guess a location for generic activities.
 
 Return ONLY JSON that conforms to the provided schema. No prose.`;
 
@@ -42,8 +52,16 @@ const RESPONSE_FORMAT = {
         matchedCategoryId: { type: ["string", "null"] },
         newCategoryName: { type: ["string", "null"] },
         imageKeywords: { type: "array", items: { type: "string" } },
+        experienceSearchQuery: { type: ["string", "null"] },
+        experienceLocation: { type: ["string", "null"] },
       },
-      required: ["matchedCategoryId", "newCategoryName", "imageKeywords"],
+      required: [
+        "matchedCategoryId",
+        "newCategoryName",
+        "imageKeywords",
+        "experienceSearchQuery",
+        "experienceLocation",
+      ],
     },
   },
 };
@@ -53,6 +71,8 @@ const ClassifyValidator = z
     matchedCategoryId: z.string().min(1).nullable(),
     newCategoryName: z.string().trim().min(1).nullable(),
     imageKeywords: z.array(z.string().trim().min(1)).min(2).max(4),
+    experienceSearchQuery: z.string().trim().min(1).max(80).nullable(),
+    experienceLocation: z.string().trim().min(1).max(80).nullable(),
   })
   .superRefine((value, ctx) => {
     const reusesExisting = value.matchedCategoryId !== null;

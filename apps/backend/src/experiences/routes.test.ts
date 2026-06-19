@@ -58,7 +58,12 @@ describe("GET /api/experiences", () => {
 
     await makeApp().request("/api/experiences?q=Tour&city=PARIS&limit=3");
 
-    expect(mockSearch).toHaveBeenCalledWith({ query: "Tour", city: "PARIS", limit: 3 });
+    expect(mockSearch).toHaveBeenCalledWith({
+      query: "Tour",
+      city: "PARIS",
+      location: undefined,
+      limit: 3,
+    });
   });
 
   it("returns 400 when q is missing", async () => {

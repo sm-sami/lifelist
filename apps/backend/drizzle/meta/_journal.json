@@ -43,6 +43,13 @@
       "when": 1781880600000,
       "tag": "0005_repair_skipped_foundation_migrations",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781901000000,
+      "tag": "0006_add_experience_search_metadata",
+      "breakpoints": true
     }
   ]
 }

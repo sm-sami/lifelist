@@ -48,7 +48,11 @@ export default function ItemDetail() {
     };
   }, [item, load]);
 
-  const { experiences, loading: expLoading, error: expError } = useExperiences(item?.title ?? "");
+  const {
+    experiences,
+    loading: expLoading,
+    error: expError,
+  } = useExperiences(item?.experienceSearchQuery ?? item?.title ?? "", item?.experienceLocation);
 
   const isCompleted = item?.status === "completed";
 

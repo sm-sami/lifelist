@@ -11,7 +11,7 @@ interface State {
   error: boolean;
 }
 
-export function useExperiences(query: string): State {
+export function useExperiences(query: string, location?: string | null): State {
   const [state, setState] = useState<State>({ experiences: [], loading: true, error: false });
 
   useEffect(() => {
@@ -20,8 +20,10 @@ export function useExperiences(query: string): State {
       return;
     }
     const controller = new AbortController();
+    const params = new URLSearchParams({ q: query, limit: "6" });
+    if (location?.trim()) params.set("location", location);
     setState((s) => ({ ...s, loading: true, error: false }));
-    apiFetch(`/experiences?q=${encodeURIComponent(query)}&limit=6`, { signal: controller.signal })
+    apiFetch(`/experiences?${params.toString()}`, { signal: controller.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error(`Experiences request failed: ${r.status}`);
         return ExperiencesResponseSchema.parse(await r.json());
@@ -37,7 +39,7 @@ export function useExperiences(query: string): State {
         }
       });
     return () => controller.abort();
-  }, [query]);
+  }, [query, location]);
 
   return state;
 }

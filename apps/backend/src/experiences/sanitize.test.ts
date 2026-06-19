@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeCard, sanitizeHeadoutResponse } from "./sanitize";
+import { isRelevantCard, sanitizeCard, sanitizeHeadoutResponse } from "./sanitize";
 
 const BASE_CARD = {
   id: 1,
@@ -99,5 +99,47 @@ describe("sanitizeHeadoutResponse", () => {
     const results = sanitizeHeadoutResponse(raw);
     expect(results).toHaveLength(1);
     expect(results[0].title).toBe("Good Experience");
+  });
+});
+
+describe("isRelevantCard", () => {
+  it("accepts a product matching the compact query and location", () => {
+    expect(
+      isRelevantCard(
+        {
+          ...BASE_CARD,
+          city: { code: "PARIS", displayName: "Paris" },
+          country: { code: "FR", displayName: "France" },
+        },
+        { query: "Eiffel Tower", location: "Paris, France" },
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects a generic trail result for an Inca Trail query", () => {
+    expect(
+      isRelevantCard(
+        {
+          ...BASE_CARD,
+          displayName: "Wadi Mujib Siq Trail Hike to the Waterfall",
+          city: { code: "AMMAN", displayName: "Amman" },
+          country: { code: "JO", displayName: "Jordan" },
+        },
+        { query: "Inca Trail", location: "Peru" },
+      ),
+    ).toBe(false);
+  });
+
+  it("allows word-form variations such as skydive and skydiving", () => {
+    expect(
+      isRelevantCard(
+        { ...BASE_CARD, displayName: "Skydive Dubai Tandem Experience" },
+        { query: "Skydiving" },
+      ),
+    ).toBe(true);
+  });
+
+  it("does not require location overlap when Headout omits location metadata", () => {
+    expect(isRelevantCard(BASE_CARD, { query: "Eiffel Tower", location: "Paris" })).toBe(true);
   });
 });

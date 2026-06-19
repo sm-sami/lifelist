@@ -9,7 +9,7 @@ const migrationFiles = readdirSync(migrationDirectory)
 
 describe("initial database migration", () => {
   it("contains the manually maintained database invariants", () => {
-    expect(migrationFiles).toHaveLength(6);
+    expect(migrationFiles).toHaveLength(7);
 
     const migration = readFileSync(join(migrationDirectory, migrationFiles[0]), "utf8");
 
@@ -104,5 +104,14 @@ describe("skipped foundation repair migration", () => {
     expect(migration).toContain("handle_auth_user_updated");
     expect(migration).toContain("on_auth_user_updated");
     expect(migration).toContain("on conflict (id) do nothing");
+  });
+});
+
+describe("experience search metadata migration", () => {
+  it("adds the normalized Headout query and location columns", () => {
+    const migration = readFileSync(join(migrationDirectory, migrationFiles[6]), "utf8");
+
+    expect(migration).toContain("experience_search_query text");
+    expect(migration).toContain("experience_location text");
   });
 });

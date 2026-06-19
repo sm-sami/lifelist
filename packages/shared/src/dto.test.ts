@@ -10,6 +10,8 @@ describe("shared DTO schemas", () => {
       imageUrl: null,
       imageAttribution: null,
       imageAttributionUrl: null,
+      experienceSearchQuery: "Northern Lights",
+      experienceLocation: "Tromso, Norway",
       status: "pending_enrichment",
       categoryId: null,
       category: null,
@@ -18,6 +20,7 @@ describe("shared DTO schemas", () => {
     });
 
     expect(item.status).toBe("pending_enrichment");
+    expect(item.experienceSearchQuery).toBe("Northern Lights");
   });
 
   it("rejects ratings outside the five-point scale", () => {

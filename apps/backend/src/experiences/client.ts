@@ -1,3 +1,4 @@
+import { normalizeExperienceQuery } from "./query";
 import { sanitizeHeadoutResponse } from "./sanitize";
 import type { Experience } from "./types";
 
@@ -34,20 +35,23 @@ function cacheSet(key: string, data: Experience[]): void {
 export interface ExperienceQuery {
   query: string;
   city?: string;
+  location?: string;
   limit?: number;
 }
 
 export async function searchExperiences({
   query,
   city,
+  location,
   limit = 6,
 }: ExperienceQuery): Promise<Experience[]> {
-  const cacheKey = `${query.toLowerCase()}:${city ?? ""}:${limit}`;
+  const normalizedQuery = normalizeExperienceQuery(query);
+  const cacheKey = `${normalizedQuery.toLowerCase()}:${city ?? ""}:${location ?? ""}:${limit}`;
   const hit = cache.get(cacheKey);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.data;
 
   const url = new URL(`${BASE}${PATH}`);
-  url.searchParams.set("query", query);
+  url.searchParams.set("query", normalizedQuery);
   url.searchParams.set("language", LANGUAGE);
   url.searchParams.set("currency", CURRENCY);
   url.searchParams.set("limit", String(limit));
@@ -73,7 +77,10 @@ export async function searchExperiences({
   }
 
   const raw = await res.json();
-  const experiences = sanitizeHeadoutResponse(raw).slice(0, limit);
+  const experiences = sanitizeHeadoutResponse(raw, {
+    query: normalizedQuery,
+    location,
+  }).slice(0, limit);
   cacheSet(cacheKey, experiences);
   return experiences;
 }
