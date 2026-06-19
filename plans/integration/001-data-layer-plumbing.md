@@ -93,7 +93,7 @@ async function getAccessToken(): Promise<string | null> {
 /**
  * Decides whether a 401 is a GENUINE auth-invalid signal (force sign-out) vs. an
  * ambiguous/transient failure (preserve the session, let the caller retry). Signing out
- * on EVERY 401 is wrong: a JWKS hiccup or a flaky edge can 401 a perfectly valid
+ * on EVERY 401 is wrong: an Auth service hiccup or a flaky edge can affect a valid
  * session and would needlessly destroy local state. We force sign-out ONLY when the
  * backend explicitly says the token/identity is bad.
  */
@@ -446,7 +446,7 @@ Two cases:
   an auth-invalid code (e.g. `token_invalid`). `apiFetch` throws `ApiError(401,
   authInvalid: true)` after a local `signOut()`; the session listener updates auth state,
   the store clears for `userId=null`, and the gate (`app/index.tsx`) redirects to sign-in.
-- **Verifier outage:** simulate a JWKS/network failure. The backend returns
+- **Verifier outage:** simulate a Supabase Auth/network failure. The backend returns
   `503 auth_verifier_unavailable`; the session is PRESERVED and the call can be retried.
 
 ### B2. Timeout, cancellation & GET retry

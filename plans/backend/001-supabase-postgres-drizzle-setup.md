@@ -411,7 +411,7 @@ alter table public.categories enable row level security;
 alter table public.items      enable row level security;
 
 -- WHY SELECT-ONLY (no owner FOR ALL): the client never writes to these tables directly.
--- ALL mutations go through Hono (service role), which runs zod validation, semantic
+-- ALL mutations go through Hono (secret key), which runs zod validation, semantic
 -- de-dup, and rate-limiting before touching the DB. Granting the client direct
 -- INSERT/UPDATE/DELETE would bypass every one of those guards, so we deliberately give
 -- the owner SELECT only (its rows, for direct reads + RLS-scoped realtime). There is NO
@@ -425,7 +425,7 @@ create policy categories_owner_select on public.categories
   using (user_id = auth.uid());
 
 -- 3. items — owner may READ their own items (direct reads + RLS-scoped realtime).
---    Writes happen only via Hono (service role). No cross-user read policy exists.
+--    Writes happen only via Hono (secret key). No cross-user read policy exists.
 drop policy if exists items_owner_all on public.items;
 drop policy if exists items_owner_select on public.items;
 create policy items_owner_select on public.items
@@ -440,7 +440,7 @@ create policy users_self_select on public.users
 ```
 
 > **CRITICAL — how this interacts with the backend:** Hono connects with the
-> **`SUPABASE_SERVICE_ROLE_KEY`** (or, equivalently, the Postgres superuser via the
+> **`SUPABASE_SECRET_KEY`** (or, equivalently, the Postgres superuser via the
 > pooled `DATABASE_URL`), which **BYPASSES RLS entirely**. So every server-side write
 > and read in backend/002–005 works regardless of these policies — RLS does **not**
 > gate the Hono API. RLS exists solely to lock down the paths where the **client talks
@@ -842,7 +842,7 @@ order by tablename, policyname;
 --         users_self_select (SELECT). NO *_owner_all policy may appear.
 ```
 
-> Behavioral note: the **service role** (what Hono uses) bypasses RLS, so the smoke
+> Behavioral note: the **secret key** (what Hono uses) bypasses RLS, so the smoke
 > tests in §D and every backend endpoint keep working. To prove RLS actually gates a
 > direct client, query a table through the Supabase JS client with an `anon` key + a
 > user JWT — you should see only your own rows, and a direct INSERT/UPDATE/DELETE must

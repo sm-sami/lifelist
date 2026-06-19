@@ -72,7 +72,7 @@ create policy "users write own broadcast topic"
 
 > **Why RLS matters here (two distinct paths):**
 > 1. **Postgres Changes on `items`:** the Expo client subscribes to Realtime **directly**
->    with its anon key + JWT — Hono is not involved. Realtime enforces the item `select`
+>    with its publishable key + JWT — Hono is not involved. Realtime enforces the item `select`
 >    policies (owner-only, from backend/001) on change events, so a client only receives
 >    changes for ITS OWN rows. Without RLS, every client would receive every user's changes.
 > 2. **Private broadcast `user:<uuid>`:** broadcast channels are NOT scoped by table RLS;
@@ -213,7 +213,7 @@ export function useItemsRealtime() {
 
 ### 3. Channel-auth + RLS model (why the direct subscription is safe)
 
-The Expo client opens BOTH realtime channels itself, with its anon key + the user's JWT —
+The Expo client opens BOTH realtime channels itself, with its publishable key + the user's JWT —
 Hono is not in the path. Two independent guards keep this safe:
 
 - **Postgres Changes** ride the items table's owner-only `select` RLS (backend/001). The

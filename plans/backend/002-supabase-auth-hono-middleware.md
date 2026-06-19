@@ -10,13 +10,10 @@
 ## 🎯 Objective
 
 1. Capture the `Authorization: Bearer <jwt>` header in Hono.
-2. **Cryptographically verify** the Supabase access token. We support both signing
-   schemes Supabase uses:
-   - **Asymmetric (recommended / modern)** — ES256/RS256 keys published at the
-     project JWKS endpoint, verified with `jose.createRemoteJWKSet` (no secret in
-     env, automatic key rotation).
-   - **Symmetric (legacy)** — HS256 with the project JWT secret, verified with
-     `jose.jwtVerify`.
+2. Verify the Supabase access token through `supabase.auth.getUser(token)`. Supabase
+   Auth performs authoritative server-side validation regardless of the project's JWT
+   signing algorithm, so Lifelist does not require separate JWT algorithm or signing
+   secret variables.
 3. Extract the authenticated user id from the `sub` claim and store it on the Hono
    context via `c.set("userId", ...)` with full TypeScript typing.
 4. Lazily **upsert** the corresponding `users` row on first authenticated request
@@ -30,24 +27,15 @@
 ### 1. Dependencies
 
 ```bash
-pnpm add jose
+pnpm add @supabase/supabase-js
 ```
-
-`jose` is a dependency-free, edge-and-node JWT library. We avoid `jsonwebtoken`
-because `jose`'s `createRemoteJWKSet` handles key caching and rotation for the
-asymmetric path.
 
 ### 2. Environment variables (add to the matrix from backend/001)
 
-| Variable                    | Value                                                        | Notes                                                         |
-| --------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| `SUPABASE_URL`              | `https://<PROJECT_REF>.supabase.co`                          | Used to derive the JWKS URL and the token issuer.            |
-| `SUPABASE_JWT_SECRET`       | (Dashboard → Settings → API → JWT Secret)                    | Only needed for the **legacy HS256** path.                   |
-| `SUPABASE_JWT_ALG`          | `ES256` \| `RS256` \| `HS256`                                | Defaults to `ES256` if unset. Picks the verification path.   |
-
-> Modern Supabase projects issue **ES256** asymmetric tokens. The JWKS endpoint is
-> `${SUPABASE_URL}/auth/v1/.well-known/jwks.json`. The token issuer claim is
-> `${SUPABASE_URL}/auth/v1`.
+| Variable                 | Value                               | Notes                                      |
+| ------------------------ | ----------------------------------- | ------------------------------------------ |
+| `SUPABASE_URL`           | `https://<PROJECT_REF>.supabase.co` | Supabase Auth endpoint.                    |
+| `SUPABASE_SECRET_KEY`    | Dashboard → Settings → API Keys     | Server-only; never include in Expo config. |
 
 ### 3. Context typing — `src/types.ts`
 
@@ -77,37 +65,33 @@ export type AppEnv = {
 export type { Item, Category, User };
 ```
 
-### 4. JWT verifier — `src/auth/verify-token.ts`
+### 4. Token verifier — `src/auth/verify-token.ts`
 
 ```ts
 // src/auth/verify-token.ts
-import {
-  jwtVerify,
-  createRemoteJWKSet,
-  type JWTPayload,
-  errors as joseErrors,
-} from "jose";
+import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 if (!SUPABASE_URL) throw new Error("SUPABASE_URL is not set.");
+const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
+if (!SUPABASE_SECRET_KEY) throw new Error("SUPABASE_SECRET_KEY is not set.");
 
-const ALG = (process.env.SUPABASE_JWT_ALG ?? "ES256").toUpperCase();
-const SUPPORTED_ALGS = new Set(["ES256", "RS256", "HS256"]);
-if (!SUPPORTED_ALGS.has(ALG)) {
-  throw new Error(`Unsupported SUPABASE_JWT_ALG: ${ALG}`);
-}
-const ISSUER = `${SUPABASE_URL}/auth/v1`;
-const AUDIENCE = "authenticated"; // Supabase sets aud=authenticated for signed-in users
+const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+  },
+});
 
 /**
  * Supabase access-token payload (the claims we rely on).
  */
-export interface SupabaseJwtPayload extends JWTPayload {
+export interface SupabaseJwtPayload {
   sub: string; // user id (UUID)
   email?: string; // OPTIONAL — phone-auth/anonymous users have none
   phone?: string; // present for phone-auth users
   role?: string; // typically "authenticated"
-  aud?: string;
   // OAuth providers (Google/GitHub/Apple) populate these on the access token.
   user_metadata?: {
     avatar_url?: string;
@@ -117,26 +101,9 @@ export interface SupabaseJwtPayload extends JWTPayload {
   };
 }
 
-/* -- Asymmetric path: remote JWKS with built-in caching & rotation -- */
-const jwks = createRemoteJWKSet(
-  new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`),
-);
-
-/* -- Symmetric path: HS256 with the static project secret -- */
-const hsSecret =
-  ALG === "HS256"
-    ? new TextEncoder().encode(requireEnv("SUPABASE_JWT_SECRET"))
-    : null;
-
-function requireEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`${name} is required for SUPABASE_JWT_ALG=HS256`);
-  return v;
-}
-
 export type VerifyResult =
   | { ok: true; payload: SupabaseJwtPayload }
-  | { ok: false; reason: "expired" | "invalid" | "malformed" | "unavailable" };
+  | { ok: false; reason: "invalid" | "unavailable" };
 
 /**
  * Verifies a Supabase access token. Returns a discriminated result rather than
@@ -144,28 +111,25 @@ export type VerifyResult =
  */
 export async function verifySupabaseToken(token: string): Promise<VerifyResult> {
   try {
-    const verifyOpts = { issuer: ISSUER, audience: AUDIENCE };
-
-    const { payload } =
-      ALG === "HS256"
-        ? await jwtVerify(token, hsSecret!, verifyOpts)
-        : await jwtVerify(token, jwks, verifyOpts);
-
-    if (typeof payload.sub !== "string" || payload.sub.length === 0) {
-      return { ok: false, reason: "malformed" };
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data.user) {
+      return {
+        ok: false,
+        reason: error?.status === 0 || (error?.status ?? 0) >= 500 ? "unavailable" : "invalid",
+      };
     }
-    return { ok: true, payload: payload as SupabaseJwtPayload };
+
+    return {
+      ok: true,
+      payload: {
+        sub: data.user.id,
+        email: data.user.email,
+        phone: data.user.phone,
+        role: data.user.role,
+        user_metadata: data.user.user_metadata,
+      },
+    };
   } catch (err) {
-    if (err instanceof joseErrors.JWTExpired) return { ok: false, reason: "expired" };
-    if (
-      err instanceof joseErrors.JWTClaimValidationFailed ||
-      err instanceof joseErrors.JWSSignatureVerificationFailed ||
-      err instanceof joseErrors.JWSInvalid
-    ) {
-      return { ok: false, reason: "invalid" };
-    }
-    // JWKS/network/service failures are not evidence that the user's token is bad.
-    // Surface a retryable verifier outage instead of forcing a client sign-out.
     console.error("[auth] token verifier unavailable", err);
     return { ok: false, reason: "unavailable" };
   }
@@ -253,8 +217,7 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
     if (result.reason === "unavailable") {
       throw new HTTPException(503, { message: "auth_verifier_unavailable" });
     }
-    const code = result.reason === "expired" ? "token_expired" : "token_invalid";
-    throw new HTTPException(401, { message: code });
+    throw new HTTPException(401, { message: "token_invalid" });
   }
 
   const { sub: userId, email } = result.payload;
@@ -376,15 +339,10 @@ export default handle(app);
 
 ## 🚶 Step-by-Step Execution Guide
 
-1. **Install `jose`** in the backend package: `pnpm add jose`.
+1. **Install Supabase JS** in the backend package: `pnpm add @supabase/supabase-js`.
 
-2. **Determine your token algorithm.** In Supabase Dashboard → Settings → API, check
-   the JWT signing keys. New projects are **ES256** (asymmetric). Set
-   `SUPABASE_JWT_ALG` accordingly (defaults to `ES256`). For legacy HS256 projects,
-   also set `SUPABASE_JWT_SECRET`.
-
-3. **Add `SUPABASE_URL`** (and the secret/alg if legacy) to `.env.local` and to Vercel
-   env vars for all environments.
+2. Add `SUPABASE_URL` and the server-only `SUPABASE_SECRET_KEY` to `.env.local` and
+   Vercel. Do not expose the secret key to Expo.
 
 4. **Create the type augmentation** `src/types.ts` (§3). This is what makes
    `c.get("userId")` type-safe everywhere.
@@ -440,9 +398,12 @@ Mint a token by signing into the Expo app, or via the Supabase JS client in a No
 REPL:
 
 ```ts
-// get-token.ts — run once with anon key + a test user
+// get-token.ts — run once with the publishable key + a test user
 import { createClient } from "@supabase/supabase-js";
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_PUBLISHABLE_KEY!,
+);
 const { data } = await supabase.auth.signInWithPassword({
   email: "test@example.com",
   password: "password123",
@@ -482,13 +443,12 @@ items have a valid `user_id` FK target.
 
 ### F. Expired-token path (optional, manual)
 
-Wait for an access token to expire (default 1h) or set a short expiry in Supabase Auth
-settings, then repeat test D — expect `{"error":"Token expired"}` with status 401,
-proving `joseErrors.JWTExpired` is mapped distinctly.
+Wait for an access token to expire, then repeat test D. Expect the generic invalid-token
+response with status 401; provider details must not be exposed.
 
 ✅ **Phase complete when:** `/health` is open, `/api/me` returns stable 401 codes for
-missing / invalid / expired tokens, returns retryable
-`503 {"error":"auth_verifier_unavailable"}` for JWKS/network outages, and returns 200
+missing, invalid, and expired tokens, returns retryable
+`503 {"error":"auth_verifier_unavailable"}` for Supabase Auth/network outages, and returns 200
 with the correct `userId`/`email` for a valid token,
 and the `users` projection row is created on first authenticated call **for every
 authenticated user — including email-less (phone-auth) users, who get a row with

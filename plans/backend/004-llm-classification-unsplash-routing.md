@@ -43,7 +43,7 @@
 | --------------------------- | ------------------------------ | ------------------------------------------------ |
 | `OPENAI_CLASSIFY_MODEL`     | `gpt-4o-mini`                  | Cheap, fast, supports JSON schema response.      |
 | `UNSPLASH_ACCESS_KEY`       | (Unsplash app access key)      | Server-side only.                                |
-| `SUPABASE_SERVICE_ROLE_KEY` | (Dashboard → API)              | Used by the backend to broadcast Realtime + write. |
+| `SUPABASE_SECRET_KEY`       | (Dashboard → API Keys)         | Used by the backend to broadcast Realtime + write. |
 | `SUPABASE_URL`              | already set in backend/002     | Reused for the Realtime broadcast client.        |
 
 ### 2. Classification — `src/ai/classify.ts`
@@ -340,20 +340,20 @@ export async function triggerUnsplashDownload(downloadLocation: string): Promise
 import { createClient } from "@supabase/supabase-js";
 
 /**
- * Server-side Supabase client (service role) used ONLY to broadcast enrichment
+ * Server-side Supabase client (secret key) used ONLY to broadcast enrichment
  * results back to the user's PRIVATE channel. The client subscribes to
  * `user:<userId>` (see integration/001 & integration/003).
  *
  * PRIVATE channel: `config.private: true` makes Supabase Realtime enforce RLS-style
  * authorization (the `realtime.messages` policy) on who may subscribe — so only the
  * owning user can read their own `user:<userId>` channel, not anyone who guesses the
- * name. The SERVER sends with the service role, which is authorized to broadcast to any
+ * name. The server sends with the secret key, which is authorized to broadcast to any
  * private channel; the CLIENT must present its JWT to subscribe (integration/001 wires
  * the matching `private: true` on the subscriber + the authorization policy).
  */
 const admin = createClient(
   process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  process.env.SUPABASE_SECRET_KEY!,
   { auth: { persistSession: false } },
 );
 
@@ -401,7 +401,7 @@ const SIGNED_URL_TTL = 3600; // seconds (1h)
 // Service-role client: the media bucket is PRIVATE, so the backend mints signed URLs.
 const storage = createClient(
   process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  process.env.SUPABASE_SECRET_KEY!,
   { auth: { persistSession: false } },
 ).storage;
 
@@ -960,7 +960,7 @@ Applied in `src/items/routes.ts` (§7) to `/create` and `/precheck` at
 ## 🚶 Step-by-Step Execution Guide
 
 1. **Add env vars** from §1 to `.env.local` and Vercel. The
-   `SUPABASE_SERVICE_ROLE_KEY` is sensitive — server-only, never in the Expo bundle.
+   `SUPABASE_SECRET_KEY` is sensitive — server-only, never in the Expo bundle.
 
 2. **Install deps:** `pnpm add openai @hono/zod-validator zod @supabase/supabase-js @vercel/functions`.
    Ensure `@lifelist/shared` is already a workspace dependency (conventions doc) — the

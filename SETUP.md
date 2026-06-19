@@ -5,7 +5,7 @@ deploy it to production. The repository is still greenfield, so commands that de
 `package.json`, `apps/backend`, or `apps/mobile` become available after phase `000` and
 the relevant scaffold phases have landed.
 
-Do not commit passwords, API keys, database URLs, service-role keys, signing credentials,
+Do not commit passwords, API keys, database URLs, secret keys, signing credentials,
 or `.env.local` files.
 
 ## 1. Accounts and access
@@ -83,8 +83,8 @@ For production, choose a region close to the Vercel deployment and save the data
 password in a password manager. Collect:
 
 - Project URL
-- Publishable key (or legacy anon key)
-- Service-role key — backend only
+- Publishable key
+- Secret key — backend only
 - Database password
 - Transaction pooler connection string on port `6543`
 - Direct database connection string on port `5432`
@@ -131,11 +131,10 @@ The local Supabase connection has this shape:
 DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 DIRECT_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
-# Supabase API and JWT verification
+# Supabase API keys
 SUPABASE_URL="http://127.0.0.1:54321"
-SUPABASE_SERVICE_ROLE_KEY="<LOCAL_SERVICE_ROLE_KEY>"
-SUPABASE_JWT_ALG="HS256"
-SUPABASE_JWT_SECRET="<LOCAL_JWT_SECRET>"
+SUPABASE_PUBLISHABLE_KEY="<LOCAL_PUBLISHABLE_KEY>"
+SUPABASE_SECRET_KEY="<LOCAL_SECRET_KEY>"
 
 # OpenAI
 OPENAI_API_KEY="<SERVER_ONLY_OPENAI_KEY>"
@@ -167,7 +166,7 @@ set +a
 pnpm db:migrate
 ```
 
-Never put `SUPABASE_SERVICE_ROLE_KEY`, database URLs, OpenAI keys, or Unsplash keys in
+Never put `SUPABASE_SECRET_KEY`, database URLs, OpenAI keys, or Unsplash keys in
 Expo config or any `EXPO_PUBLIC_*` variable.
 
 ## 5. Mobile local configuration
@@ -177,7 +176,7 @@ The mobile app needs only public client configuration:
 | Setting | Development value |
 | --- | --- |
 | `supabaseUrl` | Local Supabase API URL |
-| `supabaseAnonKey` | Local publishable/anon client key |
+| `supabasePublishableKey` | Local publishable key |
 | `apiBaseUrl` | Local backend URL ending in `/api` |
 
 The ignored local file is already configured. To recreate it, copy the committed
@@ -191,12 +190,12 @@ The mobile variables are:
 
 ```bash
 EXPO_PUBLIC_SUPABASE_URL="http://127.0.0.1:54321"
-EXPO_PUBLIC_SUPABASE_ANON_KEY="<LOCAL_PUBLISHABLE_KEY>"
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY="<LOCAL_PUBLISHABLE_KEY>"
 EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:3000/api"
 ```
 
 `app.config.ts` maps these public variables into Expo `extra.supabaseUrl`,
-`extra.supabaseAnonKey`, and `extra.apiBaseUrl`, which are the names consumed by the
+`extra.supabasePublishableKey`, and `extra.apiBaseUrl`, which are consumed by the
 planned client code. Environment-specific values stay out of committed app config.
 
 Choose the local API URL by runtime:
@@ -327,7 +326,7 @@ Recommended release order:
 6. Verify the mobile client in Expo Go after its required backend contract is live.
 
 Set OpenAI usage limits and alerts before production traffic. Configure Vercel and
-Supabase logs/alerts, and never log access tokens, service-role keys, database URLs,
+Supabase logs/alerts, and never log access tokens, secret keys, database URLs,
 image signed URLs, or complete third-party payloads containing user data.
 
 ## 8. Mobile use without app stores
@@ -352,7 +351,7 @@ optional distribution decision:
 Any mobile environment configuration contains only:
 
 - Production Supabase URL
-- Production publishable/anon key
+- Production publishable key
 - Production API base URL
 
 Test the production backend and Supabase project carefully before pointing Expo Go at

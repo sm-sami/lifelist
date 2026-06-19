@@ -54,7 +54,7 @@ Library includes its Jest matchers; do not install the deprecated
 > use it instead of `pnpm add` for native packages. Do **not** bump individual native
 > packages off the SDK-pinned versions; mismatches between reanimated/gesture-handler and
 > the SDK are the usual cause of cryptic worklet/native crashes. The same SDK number (56)
-> is used consistently throughout this doc (`app.json` `sdkVersion`, the Expo Go steps,
+> is used consistently throughout this doc (`app.config.ts` `sdkVersion`, the Expo Go steps,
 > and the verification notes).
 
 ### 2. Directory tree (expo-router)
@@ -87,38 +87,37 @@ lib/
 └── auth.tsx                  # AuthProvider + useAuth
 hooks/                        # useDebounce, etc. (frontend/003+)
 store/                        # zustand stores (integration/001)
-app.json
+app.config.ts
 babel.config.js
 ```
 
-### 3. `app.json` (expo-router + reanimated essentials)
+### 3. `app.config.ts` (expo-router + reanimated essentials)
 
-```json
-{
-  "expo": {
-    "name": "Lifelist",
-    "slug": "lifelist",
-    "scheme": "lifelist",
-    "sdkVersion": "56.0.0",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "plugins": [
-      "expo-router",
-      "react-native-edge-to-edge"
-    ],
-    "ios": { "supportsTablet": true, "bundleIdentifier": "com.lifelist.app" },
-    "android": {
-      "package": "com.lifelist.app",
-      "edgeToEdgeEnabled": true,
-      "navigationBar": { "barStyle": "light-content", "backgroundColor": "#00000000" }
-    },
-    "extra": {
-      "supabaseUrl": "https://<PROJECT_REF>.supabase.co",
-      "supabaseAnonKey": "<ANON_KEY>",
-      "apiBaseUrl": "https://<your-vercel-deployment>/api"
-    }
-  }
-}
+```ts
+import type { ExpoConfig } from "expo/config";
+
+const config: ExpoConfig = {
+  name: "Lifelist",
+  slug: "lifelist",
+  scheme: "lifelist",
+  sdkVersion: "56.0.0",
+  userInterfaceStyle: "automatic",
+  newArchEnabled: true,
+  plugins: ["expo-router", "react-native-edge-to-edge"],
+  ios: { supportsTablet: true, bundleIdentifier: "com.lifelist.app" },
+  android: {
+    package: "com.lifelist.app",
+    edgeToEdgeEnabled: true,
+    navigationBar: { barStyle: "light-content", backgroundColor: "#00000000" },
+  },
+  extra: {
+    supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
+    supabasePublishableKey: process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL,
+  },
+};
+
+export default config;
 ```
 
 > - `userInterfaceStyle: "automatic"` lets the app render both light and dark (the
@@ -126,7 +125,7 @@ babel.config.js
 > - `edgeToEdgeEnabled` + `react-native-edge-to-edge` make Android draw under the
 >   system bars (the modern Expo default) — which is exactly why every screen must use
 >   safe-area insets (§7b).
-> - The **anon** key is safe to ship (gated by RLS); service-role + third-party keys
+> - The **publishable** key is safe to ship (gated by RLS); secret + third-party keys
 >   live only on the backend.
 > - **Fonts are NOT pinned in `plugins` here** because the default build ships the free
 >   Sora / Hanken Grotesk fallback (loaded at runtime via `@expo-google-fonts/*`, which
@@ -454,7 +453,7 @@ import {
 
 /**
  * Flip to `true` ONLY after the Halyard licence is confirmed AND the .otf files exist at
- * assets/fonts/ (and the expo-font plugin entry is added to app.json — see §3). Until
+ * assets/fonts/ (and the expo-font plugin entry is added to app.config.ts — see §3). Until
  * then this stays `false` and the app ships the free Sora / Hanken Grotesk fallback,
  * which requires no local font files and no config plugin.
  */
@@ -489,7 +488,7 @@ export function useBrandFonts() {
 ```
 
 > Only when `USE_HALYARD` is `true` do you also add the `["expo-font", { fonts: [...] }]`
-> plugin entry (the licensed `.otf` paths) to `app.json` §3. The default fallback uses
+> plugin entry (the licensed `.otf` paths) to `app.config.ts` §3. The default fallback uses
 > `@expo-google-fonts/*` modules, which need no config plugin.
 
 ### 6. Supabase client — `lib/supabase.ts`
@@ -503,16 +502,16 @@ import { AppState } from "react-native";
 import Constants from "expo-constants";
 
 const extra = Constants.expoConfig?.extra as
-  | { supabaseUrl?: string; supabaseAnonKey?: string }
+  | { supabaseUrl?: string; supabasePublishableKey?: string }
   | undefined;
 const supabaseUrl = extra?.supabaseUrl;
-const supabaseAnonKey = extra?.supabaseAnonKey;
+const supabasePublishableKey = extra?.supabasePublishableKey;
 
 // Safe init failure path: a missing/typo'd env should throw a CLEAR error at startup,
 // not a cryptic "Invalid URL" deep inside supabase-js (or a silently broken client).
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!supabaseUrl || !supabasePublishableKey) {
   throw new Error(
-    "[supabase] Missing supabaseUrl / supabaseAnonKey in app.json `extra`. " +
+    "[supabase] Missing supabaseUrl / supabasePublishableKey in Expo config `extra`. " +
       "Set them (§3) before launching.",
   );
 }
@@ -528,7 +527,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
  *    during init and the app hangs forever on the font/auth gate. This is the
  *    RN-recommended lock from supabase-js.
  */
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,
@@ -832,16 +831,16 @@ bars), the following rules are mandatory and apply to every screen:
 2. **Set the `@/*` path alias** in `tsconfig.json`. Keep Babel on
    `babel-preset-expo`; do not add a manual Reanimated/Worklets plugin (§4).
 
-3. **Configure `app.json`** (§3): `scheme`, `userInterfaceStyle: "automatic"`,
+3. **Configure `app.config.ts`** (§3): `scheme`, `userInterfaceStyle: "automatic"`,
    `newArchEnabled`, the `expo-router` / `react-native-edge-to-edge` / `expo-font`
    plugins, Android `edgeToEdgeEnabled`, and the `extra` block with
-   `supabaseUrl`/`supabaseAnonKey`/`apiBaseUrl`.
+   `supabaseUrl`/`supabasePublishableKey`/`apiBaseUrl`.
 
 4. **Add the design system** `lib/tokens.ts` + `lib/theme.ts` + `lib/useTheme.tsx` (§5),
    then wire up fonts (§5b): the default `USE_HALYARD = false` ships the free Sora /
    Hanken Grotesk fallback via `@expo-google-fonts/*` — no local files, no config plugin,
    works out of the box. **Only if Halyard's licence is confirmed**, drop the `.otf`s
-   into `assets/fonts/`, add the `expo-font` plugin entry to `app.json` §3, and flip
+   into `assets/fonts/`, add the `expo-font` plugin entry to `app.config.ts` §3, and flip
    `USE_HALYARD = true`. The token family names are brand-neutral aliases, so either set
    plugs in with no component edits.
 

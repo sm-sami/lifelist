@@ -111,7 +111,7 @@ using (
 -- URL minted under the owner's JWT, which the owner-scoped SELECT policy authorizes.
 ```
 
-> Because the Expo app uploads with the user's anon-key + JWT (not the service role),
+> Because the Expo app uploads with the user's publishable key + JWT (not the secret key),
 > these policies are what actually prevent user A from accessing user B's folder. Hono
 > never sees the binary, so RLS — not the JWT middleware — is the guard here. The
 > owner-scoped **SELECT** policy is required for both `createSignedUrl` (private read) and
@@ -233,7 +233,7 @@ Do not create a second implementation here. Implement the single
 - Confirm the uploaded object exists before changing the database pointer.
 - Lock the owner-scoped item row before replacing `image_url`.
 - Commit the new path before deleting anything.
-- After commit, use the backend service-role storage client to best-effort delete the
+- After commit, use the backend secret-key Storage client to best-effort delete the
   previous private object path; never delete an external URL.
 - Return the canonical `ItemDto`, so `imageUrl` is already a signed URL. The client never
   receives or tries to reverse-engineer the previous private path.
