@@ -9,7 +9,7 @@ const migrationFiles = readdirSync(migrationDirectory)
 
 describe("initial database migration", () => {
   it("contains the manually maintained database invariants", () => {
-    expect(migrationFiles).toHaveLength(3);
+    expect(migrationFiles).toHaveLength(4);
 
     const migration = readFileSync(join(migrationDirectory, migrationFiles[0]), "utf8");
 
@@ -57,5 +57,23 @@ describe("user provisioning trigger migration", () => {
     expect(migration).toContain("on_auth_user_updated");
     expect(migration).toContain("after update of email, raw_user_meta_data on auth.users");
     expect(migration).toContain("security definer set search_path = public");
+  });
+});
+
+describe("item image storage migration", () => {
+  it("creates a private bucket with owner-folder storage policies", () => {
+    const migration = readFileSync(join(migrationDirectory, migrationFiles[3]), "utf8");
+
+    expect(migration).toContain("insert into storage.buckets");
+    expect(migration).toContain("'item-images'");
+    expect(migration).toContain("false");
+    expect(migration).toContain("5242880");
+    expect(migration).toContain("array['image/jpeg', 'image/png', 'image/webp']");
+    expect(migration).toContain('create policy "users select own item images"');
+    expect(migration).toContain('create policy "users insert own item images"');
+    expect(migration).toContain('create policy "users update own item images"');
+    expect(migration).toContain('create policy "users delete own item images"');
+    expect(migration).toContain("(storage.foldername(name))[1] = auth.uid()::text");
+    expect(migration).toContain("with check");
   });
 });

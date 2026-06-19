@@ -272,6 +272,26 @@ describe("PATCH /api/items/:id/image", () => {
     expect((await res.json()).error).toBe("invalid_image_path");
   });
 
+  it("returns 400 for a path in the user folder but for a different item id", async () => {
+    const res = await makeApp(userId).request(`/api/items/${itemId}/image`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imagePath: `${userId}/other-item/${VALID_UUID}.jpg` }),
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("invalid_image_path");
+  });
+
+  it("returns 400 for an otherwise valid path carrying a query string", async () => {
+    const res = await makeApp(userId).request(`/api/items/${itemId}/image`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imagePath: `${validPath}?v=123` }),
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("invalid_image_path");
+  });
+
   it("returns 400 when the uploaded file doesn't exist in storage", async () => {
     mockStoredImageExists.mockResolvedValueOnce(false);
 
