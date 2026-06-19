@@ -8,6 +8,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  vector,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable(
@@ -65,6 +66,8 @@ export const items = pgTable(
     })
       .notNull()
       .default("pending_enrichment"),
+    embedding: vector("embedding", { dimensions: 1536 }),
+    embeddingModel: text("embedding_model"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -87,6 +90,10 @@ export const items = pgTable(
       sql`${table.status} in ('pending_enrichment', 'active', 'completed')`,
     ),
     check("items_title_not_empty_ck", sql`char_length(trim(${table.title})) > 0`),
+    check(
+      "items_embedding_model_pair",
+      sql`(${table.embedding} is null) = (${table.embeddingModel} is null)`,
+    ),
   ],
 );
 

@@ -8,6 +8,13 @@
       "when": 1781867411476,
       "tag": "0000_skinny_network",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1750355000000,
+      "tag": "0001_add_item_embedding",
+      "breakpoints": true
     }
   ]
 }
