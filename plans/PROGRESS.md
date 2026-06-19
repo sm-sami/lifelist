@@ -11,7 +11,7 @@
 |-------|-------|--------|-------|--------|---------------|-------|
 | 000 | Conventions & tooling (pnpm workspace, Biome, gate) | ✅ | srmf2025@gmail.com | phase/000 | 2026-06-19 10:06 | do first; unblocks everything |
 | backend/001 | Supabase Postgres + Drizzle setup | ✅ | srmf2025@gmail.com | phase/backend-001 | 2026-06-19 11:22 | |
-| backend/002 | Supabase auth + Hono JWT middleware | ⬜ | — | — | — | |
+| backend/002 | Supabase auth + Hono JWT middleware | ✅ | mohamed.sami@headout.com | phase/backend-002 | 2026-06-19 17:06 | |
 | backend/003 | AI embeddings + pgvector de-dup | ⬜ | — | — | — | |
 | backend/004 | LLM classify, gradient, Unsplash, /items/create | ⬜ | — | — | — | |
 | backend/005 | Headout v3 search proxy | ⬜ | — | — | — | live GET contract pinned 2026-06-19 |
