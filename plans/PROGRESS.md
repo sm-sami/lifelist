@@ -20,7 +20,7 @@
 | frontend/003 | Smart-Add overlay + debouncer | ✅ | mohamed.sami@headout.com | phase/frontend-003 | 2026-06-19 19:30 | |
 | frontend/004 | Item detail parallax + bottom sheet | ✅ | srmf2025@gmail.com | phase/frontend-004 | 2026-06-19 14:06 | |
 | frontend/005 | Celebration canvas + hold-to-stamp | ✅ | srmf2025@gmail.com | phase/frontend-005 | 2026-06-19 14:15 | |
-| integration/001 | Data-layer plumbing (JWT client + stores) | ⬜ | — | — | — | |
+| integration/001 | Data-layer plumbing (JWT client + stores) | ✅ | srmf2025@gmail.com | phase/integration-001 | 2026-06-19 14:22 | |
 | integration/002 | Media pipeline (private Storage + signed URLs) | ⬜ | — | — | — | |
 | integration/003 | Realtime item sync (private enrichment push) | ⬜ | — | — | — | |
 
