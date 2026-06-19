@@ -14,6 +14,7 @@ export interface ItemsState {
   refetch: () => void;
   addOptimistic: (item: Item) => void;
   fetchItemById: (id: string) => Promise<FetchResult>;
+  upsert: (item: Item) => void;
 }
 
 // Stub hook — returns empty list in loading state until integration/001.
@@ -24,6 +25,7 @@ export function useItems<T>(selector: (s: ItemsState) => T): T {
     refetch: () => {},
     addOptimistic: () => {},
     fetchItemById: async () => ({ kind: "error" }),
+    upsert: () => {},
   };
   return selector(stub);
 }
@@ -43,6 +45,7 @@ export function useItemsStore<T>(selector: (s: ItemsState) => T): T {
     refetch: () => {},
     addOptimistic: () => {},
     fetchItemById: async () => ({ kind: "error" }),
+    upsert: () => {},
   };
   return selector(stub);
 }
