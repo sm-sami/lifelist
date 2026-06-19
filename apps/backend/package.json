@@ -4,13 +4,26 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx db/migrate.ts",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@lifelist/shared": "workspace:*"
+    "@hono/node-server": "^2.0.5",
+    "@lifelist/shared": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.26",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
+    "@types/node": "^26.0.0",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.22.4",
     "vitest": "2.1.9"
   }
 }

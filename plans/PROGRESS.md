@@ -10,7 +10,7 @@
 | Phase | Title | Status | Owner | Branch | Updated (UTC) | Notes |
 |-------|-------|--------|-------|--------|---------------|-------|
 | 000 | Conventions & tooling (pnpm workspace, Biome, gate) | ✅ | srmf2025@gmail.com | phase/000 | 2026-06-19 10:06 | do first; unblocks everything |
-| backend/001 | Supabase Postgres + Drizzle setup | ⬜ | — | — | — | |
+| backend/001 | Supabase Postgres + Drizzle setup | ✅ | srmf2025@gmail.com | phase/backend-001 | 2026-06-19 11:22 | |
 | backend/002 | Supabase auth + Hono JWT middleware | ⬜ | — | — | — | |
 | backend/003 | AI embeddings + pgvector de-dup | ⬜ | — | — | — | |
 | backend/004 | LLM classify, gradient, Unsplash, /items/create | ⬜ | — | — | — | |

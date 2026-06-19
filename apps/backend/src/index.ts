@@ -1,11 +1,7 @@
-import type { Experience, ItemDto } from "@lifelist/shared";
+import { Hono } from "hono";
 
-/** Compile-time proof that backend code consumes the canonical shared contracts. */
-export function summarizeItem(item: ItemDto): string {
-  return `${item.id}:${item.status}:${item.category?.name ?? "uncategorized"}`;
-}
+const app = new Hono();
 
-/** Referencing a concrete field makes shared DTO renames fail backend typecheck. */
-export function experiencePriceToken(experience: Experience): string {
-  return experience.priceToken;
-}
+app.get("/health", (c) => c.json({ ok: true, ts: Date.now() }));
+
+export default app;
