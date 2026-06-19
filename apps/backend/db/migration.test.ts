@@ -9,7 +9,7 @@ const migrationFiles = readdirSync(migrationDirectory)
 
 describe("initial database migration", () => {
   it("contains the manually maintained database invariants", () => {
-    expect(migrationFiles).toHaveLength(5);
+    expect(migrationFiles).toHaveLength(6);
 
     const migration = readFileSync(join(migrationDirectory, migrationFiles[0]), "utf8");
 
@@ -89,5 +89,20 @@ describe("realtime item sync migration", () => {
     expect(migration).toContain('create policy "users write own broadcast topic"');
     expect(migration).toContain("split_part(realtime.topic(), ':', 2)");
     expect(migration).toContain("realtime.messages.extension = 'broadcast'");
+  });
+});
+
+describe("skipped foundation repair migration", () => {
+  it("idempotently restores embedding columns and user provisioning triggers", () => {
+    const migration = readFileSync(join(migrationDirectory, migrationFiles[5]), "utf8");
+
+    expect(migration).toContain("add column embedding vector(1536)");
+    expect(migration).toContain("add column embedding_model text");
+    expect(migration).toContain("items_embedding_model_pair");
+    expect(migration).toContain("handle_new_auth_user");
+    expect(migration).toContain("on_auth_user_created");
+    expect(migration).toContain("handle_auth_user_updated");
+    expect(migration).toContain("on_auth_user_updated");
+    expect(migration).toContain("on conflict (id) do nothing");
   });
 });
