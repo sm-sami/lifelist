@@ -22,7 +22,7 @@
 | frontend/005 | Celebration canvas + hold-to-stamp | ✅ | srmf2025@gmail.com | phase/frontend-005 | 2026-06-19 14:15 | |
 | integration/001 | Data-layer plumbing (JWT client + stores) | ✅ | srmf2025@gmail.com | phase/integration-001 | 2026-06-19 14:22 | |
 | integration/002 | Media pipeline (private Storage + signed URLs) | ✅ | srmf2025@gmail.com | phase/integration-002 | 2026-06-19 14:34 | prod storage migration pending explicit approval |
-| integration/003 | Realtime item sync (private enrichment push) | ⬜ | — | — | — | |
+| integration/003 | Realtime item sync (private enrichment push) | ✅ | srmf2025@gmail.com | phase/integration-003 | 2026-06-19 14:37 | prod realtime migration pending explicit approval |
 
 ## Dependency map (what unblocks what — for parallelizing across authors)
 

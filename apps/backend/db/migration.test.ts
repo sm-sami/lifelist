@@ -9,7 +9,7 @@ const migrationFiles = readdirSync(migrationDirectory)
 
 describe("initial database migration", () => {
   it("contains the manually maintained database invariants", () => {
-    expect(migrationFiles).toHaveLength(4);
+    expect(migrationFiles).toHaveLength(5);
 
     const migration = readFileSync(join(migrationDirectory, migrationFiles[0]), "utf8");
 
@@ -75,5 +75,19 @@ describe("item image storage migration", () => {
     expect(migration).toContain('create policy "users delete own item images"');
     expect(migration).toContain("(storage.foldername(name))[1] = auth.uid()::text");
     expect(migration).toContain("with check");
+  });
+});
+
+describe("realtime item sync migration", () => {
+  it("publishes items changes and secures private broadcast topics", () => {
+    const migration = readFileSync(join(migrationDirectory, migrationFiles[4]), "utf8");
+
+    expect(migration).toContain("alter publication supabase_realtime add table items");
+    expect(migration).toContain("pg_publication_tables");
+    expect(migration).toContain("alter table realtime.messages enable row level security");
+    expect(migration).toContain('create policy "users read own broadcast topic"');
+    expect(migration).toContain('create policy "users write own broadcast topic"');
+    expect(migration).toContain("split_part(realtime.topic(), ':', 2)");
+    expect(migration).toContain("realtime.messages.extension = 'broadcast'");
   });
 });

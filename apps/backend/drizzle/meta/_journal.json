@@ -29,6 +29,13 @@
       "when": 1781868000000,
       "tag": "0003_item_images_storage",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781868600000,
+      "tag": "0004_realtime_item_sync",
+      "breakpoints": true
     }
   ]
 }
