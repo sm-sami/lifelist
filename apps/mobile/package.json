@@ -1,0 +1,24 @@
+{
+  "name": "mobile",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "jest --passWithNoTests --no-watchman"
+  },
+  "dependencies": {
+    "@lifelist/shared": "workspace:*",
+    "expo": "~56.0.0"
+  },
+  "devDependencies": {
+    "@react-native/jest-preset": "0.86.0",
+    "@testing-library/react-native": "13.3.3",
+    "@types/jest": "29.5.14",
+    "jest": "29.7.0",
+    "jest-expo": "~56.0.0"
+  },
+  "jest": {
+    "preset": "jest-expo"
+  }
+}

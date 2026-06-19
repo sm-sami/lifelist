@@ -12,6 +12,7 @@ AI bucket-list app. Greenfield. The full build is specified in `plans/` (start w
 - To work a phase: `scripts/session.sh start <id>`, then read **only** that phase doc + this file.
   Do **not** read the whole `plans/` tree.
 - Board: `scripts/session.sh status`. Hand off: `scripts/session.sh handoff done`.
+- Integrate a completed phase: `scripts/merge-to-main.sh "<conventional commit message>"`.
 - Trust this file for conventions instead of re-exploring the repo.
 
 ## Agent-agnostic scripts (`scripts/`)
@@ -20,7 +21,7 @@ These do the real work with plain git + POSIX shell, so any agent or a human can
 | Script | What it does |
 |--------|--------------|
 | `scripts/session.sh <status\|start\|log\|handoff\|sync\|take-over> [args]` | Claim/branch/ledger/handoff with git optimistic locking + runs the gate on handoff |
-| `scripts/pr-from-handoff.sh` | Opens a PR for the current `phase/<id>` branch using the latest session handoff as the body |
+| `scripts/merge-to-main.sh "<message>"` | Runs the gate, squash-merges the completed phase directly to `main`, commits once, and pushes |
 | `scripts/scaffold-screen.sh <screen\|component> <Name>` | Generates a new Expo file pre-wired with `useTheme()` + safe-area + Halyard tokens |
 
 The `.agent/skills/*` files are thin wrappers that call these scripts; the
@@ -51,5 +52,10 @@ Both must exit 0. **Never mark a phase ✅ in the ledger if the gate fails** (`s
 
 ## Conventions
 - pnpm only (`pnpm add`, `pnpm <script>`, `pnpm tsx`, `pnpm expo`). Never npm/npx.
-- Work on `phase/<id>` branches, never `main`. Keep ledger edits tiny and pushed immediately.
+- Work on `phase/<id>` branches, never directly on `main`.
+- Ledger claim/handoff commits stay on phase branches. Integrate with
+  `scripts/merge-to-main.sh` so `main` receives one squash commit and no standalone
+  ledger commits.
+- Use a concise conventional commit describing the implementation, without phase numbers
+  (for example `chore: implement workspace tooling`).
 - Shared types live in `packages/shared` — change a DTO there, both apps' typechecks enforce it.

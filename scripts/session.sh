@@ -215,6 +215,9 @@ cmd_handoff() {
   git commit -q -m "chore(ledger): handoff $id ($state)" || true
   push
   echo "Handoff '$state' recorded for $id (gate: $gate_word, tests: $test_word)."
+  if [ "$state" = "done" ] && [ "$PUSH_FAILED" -eq 0 ]; then
+    echo 'Next: scripts/merge-to-main.sh "<conventional commit message>"'
+  fi
 
   # Surface real failures with a non-zero exit so the author notices:
   #  - a 'done' that was downgraded because checks failed / pnpm missing, OR

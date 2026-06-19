@@ -8,4 +8,8 @@ work by reading their latest handoff for a phase. The canonical status lives in
 [`../PROGRESS.md`](../PROGRESS.md); these files hold the detail (what was done, gotchas,
 what's next, verification result).
 
+Session and ledger commits stay on phase branches. Completed phases are squash-merged
+directly into `main` with `scripts/merge-to-main.sh`, producing one conventional
+implementation commit.
+
 Example: `backend-003-mohamed.sami-20260619.md`.

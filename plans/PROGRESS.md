@@ -9,7 +9,7 @@
 
 | Phase | Title | Status | Owner | Branch | Updated (UTC) | Notes |
 |-------|-------|--------|-------|--------|---------------|-------|
-| 000 | Conventions & tooling (pnpm workspace, Biome, gate) | ⬜ | — | — | — | do first; unblocks everything |
+| 000 | Conventions & tooling (pnpm workspace, Biome, gate) | ✅ | srmf2025@gmail.com | phase/000 | 2026-06-19 10:06 | do first; unblocks everything |
 | backend/001 | Supabase Postgres + Drizzle setup | ⬜ | — | — | — | |
 | backend/002 | Supabase auth + Hono JWT middleware | ⬜ | — | — | — | |
 | backend/003 | AI embeddings + pgvector de-dup | ⬜ | — | — | — | |
@@ -62,4 +62,6 @@
 - `/plan-session start [phase]` — claim + branch + begin.
 - `/plan-session log "note"` — drop a breadcrumb.
 - `/plan-session handoff done|blocked|paused` — run the gate, write the handoff, update this board.
+- `scripts/merge-to-main.sh "<conventional commit message>"` — squash a completed phase
+  directly into `main`; ledger-only commits do not enter main history.
 - `/plan-session sync` — pull and see what teammates changed.
