@@ -1,6 +1,6 @@
 import type { DuplicateMatch } from "@/lib/api/items";
 import { useTheme } from "@/lib/useTheme";
-import { Ionicons } from "@expo/vector-icons";
+import { AlertCircle } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInUp, FadeOutUp } from "react-native-reanimated";
 
@@ -19,7 +19,7 @@ export function DuplicateAlertBanner({ match, onViewExisting, onAddAnyway }: Pro
       style={[styles.banner, { borderRadius: radius.md }]}
     >
       <View style={styles.row}>
-        <Ionicons name="alert-circle" size={20} color={colors.danger} />
+        <AlertCircle size={20} color={colors.danger} />
         <Text style={[styles.text, { color: colors.textPrimary }]}>
           Looks like <Text style={styles.bold}>"{match.title}"</Text> is already on your list{"  "}
           <Text style={[styles.sim, { color: colors.danger }]}>

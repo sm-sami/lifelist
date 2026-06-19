@@ -1,7 +1,10 @@
+import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
+import { db } from "../db/client";
+import { users } from "../db/schema";
 import { DuplicateItemError } from "./ai/errors";
 import { authMiddleware } from "./auth/middleware";
 import { experiencesRoutes } from "./experiences/routes";
@@ -24,7 +27,20 @@ app.get("/health", (c) => c.json({ ok: true, ts: Date.now() }));
 
 app.use("/api/*", authMiddleware);
 
-app.get("/api/me", (c) => c.json({ userId: c.get("userId"), email: c.get("userEmail") }));
+app.get("/api/me", async (c) => {
+  const userId = c.get("userId");
+  const email = c.get("userEmail");
+  const [row] = await db
+    .select({ displayName: users.displayName, avatarUrl: users.avatarUrl })
+    .from(users)
+    .where(eq(users.id, userId));
+  return c.json({
+    userId,
+    email,
+    displayName: row?.displayName ?? null,
+    avatarUrl: row?.avatarUrl ?? null,
+  });
+});
 
 app.route("/api/items", itemsRoutes);
 app.route("/api/experiences", experiencesRoutes);

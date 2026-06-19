@@ -30,9 +30,8 @@ export default function SignUp() {
     setLoading(false);
     if (error) {
       Alert.alert("Sign-up failed", error.message);
-    } else {
-      Alert.alert("Check your email", "We sent you a confirmation link.");
     }
+    // On success the auth state change fires and the root layout redirects automatically.
   }
 
   return (

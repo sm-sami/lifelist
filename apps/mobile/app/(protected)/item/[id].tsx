@@ -1,13 +1,17 @@
-import { ChangePhotoButton } from "@/components/ChangePhotoButton";
 import { ExperienceCard } from "@/components/ExperienceCard";
 import { HoldToStampButton } from "@/components/HoldToStampButton";
 import { ParallaxScrollView } from "@/components/ParallaxScrollView";
+import { EmptyIllustration, ErrorIllustration } from "@/components/SheetIllustration";
 import { useExperiences } from "@/hooks/useExperiences";
 import { useTheme } from "@/lib/useTheme";
 import { useItem, useItemsStore } from "@/store/items";
-import { Ionicons } from "@expo/vector-icons";
-import BottomSheet, { BottomSheetFlatList, BottomSheetView } from "@gorhom/bottom-sheet";
+import BottomSheet, {
+  BottomSheetFlatList,
+  BottomSheetView,
+  useBottomSheetSpringConfigs,
+} from "@gorhom/bottom-sheet";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { ChevronLeft, CloudOff, Search } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,6 +27,12 @@ export default function ItemDetail() {
   const fetchItemById = useItemsStore((s) => s.fetchItemById);
   const sheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ["18%", "85%"], []);
+  const sheetAnimation = useBottomSheetSpringConfigs({
+    damping: 30,
+    stiffness: 150,
+    mass: 1,
+    overshootClamping: true,
+  });
 
   const [resolve, setResolve] = useState<Resolve>(item ? "ready" : "loading");
   const loadGeneration = useRef(0);
@@ -52,6 +62,7 @@ export default function ItemDetail() {
     experiences,
     loading: expLoading,
     error: expError,
+    refetch: refetchExp,
   } = useExperiences(item?.experienceSearchQuery ?? item?.title ?? "", item?.experienceLocation);
 
   const isCompleted = item?.status === "completed";
@@ -62,6 +73,35 @@ export default function ItemDetail() {
       item?.category?.gradientEnd ?? colors.canvas,
     ],
     [item, colors],
+  );
+
+  const experienceHeader = (
+    <View style={styles.sheetHeader}>
+      <View style={styles.sheetHeadingRow}>
+        <View style={styles.sheetHeadingCopy}>
+          <Text style={[styles.sheetEyebrow, { color: colors.accentText }]}>MAKE IT HAPPEN</Text>
+          <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Experiences</Text>
+        </View>
+        {!expLoading && !expError && experiences.length > 0 ? (
+          <View
+            style={[
+              styles.resultCount,
+              {
+                backgroundColor: colors.surfaceTint,
+                borderRadius: radius.pill,
+              },
+            ]}
+          >
+            <Text style={[styles.resultCountText, { color: colors.accentText }]}>
+              {experiences.length}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+      <Text style={[styles.sheetSubtitle, { color: colors.textSecondary }]}>
+        Bookable options from Headout
+      </Text>
+    </View>
   );
 
   if (!item && resolve === "loading") {
@@ -75,7 +115,7 @@ export default function ItemDetail() {
   if (!item && resolve === "error") {
     return (
       <View style={[styles.center, styles.notFound, { backgroundColor: colors.canvas }]}>
-        <Ionicons name="cloud-offline" size={40} color={colors.textSecondary} />
+        <CloudOff size={40} color={colors.textSecondary} />
         <Text style={[styles.notFoundTitle, { color: colors.textPrimary }]}>
           Couldn't load this item
         </Text>
@@ -110,7 +150,7 @@ export default function ItemDetail() {
   if (!item) {
     return (
       <View style={[styles.center, styles.notFound, { backgroundColor: colors.canvas }]}>
-        <Ionicons name="search" size={40} color={colors.textSecondary} />
+        <Search size={40} color={colors.textSecondary} />
         <Text style={[styles.notFoundTitle, { color: colors.textPrimary }]}>Item not found</Text>
         <Text style={[styles.notFoundSub, { color: colors.textSecondary }]}>
           This Lifelist item may have been removed.
@@ -139,7 +179,7 @@ export default function ItemDetail() {
             accessibilityLabel="Go back"
             style={[styles.back, { top: insets.top + 8 }]}
           >
-            <Ionicons name="chevron-back" size={24} color="#fff" />
+            <ChevronLeft size={24} color="#fff" />
           </Pressable>
         }
       >
@@ -172,14 +212,8 @@ export default function ItemDetail() {
           </Text>
         ) : null}
 
-        <ChangePhotoButton itemId={item.id} />
-
         <HoldToStampButton itemId={item.id} completed={isCompleted} />
 
-        <Text style={[styles.section, { color: colors.textPrimary }]}>Make it happen</Text>
-        <Text style={[styles.sectionSub, { color: colors.textSecondary }]}>
-          Live experiences from Headout
-        </Text>
         <View style={{ height: 380 }} />
       </ParallaxScrollView>
 
@@ -187,6 +221,7 @@ export default function ItemDetail() {
         ref={sheetRef}
         index={0}
         snapPoints={snapPoints}
+        animationConfigs={sheetAnimation}
         backgroundStyle={[
           styles.sheetBg,
           {
@@ -197,24 +232,51 @@ export default function ItemDetail() {
         ]}
         handleIndicatorStyle={{ backgroundColor: colors.borderGlass }}
       >
-        <BottomSheetView style={styles.sheetHeader}>
-          <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Experiences</Text>
-        </BottomSheetView>
         {expLoading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={colors.accent} />
-          </View>
-        ) : expError || experiences.length === 0 ? (
-          <View style={styles.center}>
-            <Text style={[styles.empty, { color: colors.textSecondary }]}>
-              No live experiences right now.
-            </Text>
-          </View>
+          <BottomSheetView style={styles.sheetState}>
+            {experienceHeader}
+            <View style={styles.sheetCenter}>
+              <ActivityIndicator color={colors.accent} />
+            </View>
+          </BottomSheetView>
+        ) : expError ? (
+          <BottomSheetView style={styles.sheetState}>
+            {experienceHeader}
+            <View style={styles.sheetCenter}>
+              <ErrorIllustration />
+              <Text style={[styles.empty, { color: colors.textSecondary, marginTop: 16 }]}>
+                Couldn't load experiences.
+              </Text>
+              <Pressable
+                onPress={refetchExp}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading experiences"
+                style={[styles.expRetry, { borderColor: colors.accent, borderRadius: radius.md }]}
+              >
+                <Text style={[styles.expRetryText, { color: colors.accent }]}>Retry</Text>
+              </Pressable>
+            </View>
+          </BottomSheetView>
+        ) : experiences.length === 0 ? (
+          <BottomSheetView style={styles.sheetState}>
+            {experienceHeader}
+            <View style={styles.sheetCenter}>
+              <EmptyIllustration />
+              <Text style={[styles.empty, { color: colors.textSecondary, marginTop: 16 }]}>
+                No live experiences right now.
+              </Text>
+            </View>
+          </BottomSheetView>
         ) : (
           <BottomSheetFlatList
             data={experiences}
             keyExtractor={(e, i) => `${e.bookingUrl}-${i}`}
-            contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={experienceHeader}
+            contentContainerStyle={{
+              paddingHorizontal: 20,
+              paddingBottom: insets.bottom + 24,
+            }}
             renderItem={({ item: exp }) => <ExperienceCard exp={exp} />}
           />
         )}
@@ -248,10 +310,33 @@ const styles = StyleSheet.create({
   attribution: { fontSize: 12, lineHeight: 16, marginTop: 12 },
   attributionName: { fontWeight: "600" },
   attributionLink: { fontWeight: "600", textDecorationLine: "underline" },
-  section: { fontSize: 18, fontWeight: "800", marginTop: 28 },
-  sectionSub: { fontSize: 13, marginTop: 4 },
   sheetBg: {},
-  sheetHeader: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
-  sheetTitle: { fontSize: 16, fontWeight: "800" },
-  empty: {},
+  sheetHeader: { width: "100%", paddingTop: 6, paddingBottom: 12 },
+  sheetHeadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sheetHeadingCopy: { flex: 1, minWidth: 0 },
+  sheetEyebrow: { fontSize: 10, fontWeight: "800", letterSpacing: 1.3, marginBottom: 3 },
+  sheetTitle: { fontSize: 20, lineHeight: 25, fontWeight: "800" },
+  sheetSubtitle: { fontSize: 13, lineHeight: 18, marginTop: 4 },
+  sheetState: { flex: 1, paddingHorizontal: 20, paddingBottom: 24 },
+  sheetCenter: {
+    flex: 1,
+    minHeight: 420,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  resultCount: {
+    minWidth: 30,
+    height: 30,
+    paddingHorizontal: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  resultCountText: { fontSize: 13, fontWeight: "800" },
+  empty: { textAlign: "center", paddingHorizontal: 24 },
+  expRetry: { marginTop: 12, paddingHorizontal: 20, paddingVertical: 10, borderWidth: 1 },
+  expRetryText: { fontSize: 14, fontWeight: "700" },
 });

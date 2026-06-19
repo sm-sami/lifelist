@@ -9,6 +9,16 @@ vi.mock("./auth/verify-token", () => ({
 // Replace with an empty Hono-compatible stub so index.test stays focused on auth middleware.
 vi.mock("./items/routes", () => ({ itemsRoutes: { routes: [] } }));
 vi.mock("./experiences/routes", () => ({ experiencesRoutes: { routes: [] } }));
+// db/client throws without DATABASE_URL; stub out the select chain used by /api/me.
+vi.mock("../db/client", () => ({
+  db: {
+    select: vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([]),
+      }),
+    }),
+  },
+}));
 
 import { verifySupabaseToken } from "./auth/verify-token";
 import app from "./index";
@@ -73,7 +83,12 @@ describe("GET /api/me — auth middleware", () => {
     });
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ userId: "user-uuid-123", email: "test@example.com" });
+    expect(body).toEqual({
+      userId: "user-uuid-123",
+      email: "test@example.com",
+      displayName: null,
+      avatarUrl: null,
+    });
   });
 
   it("returns 200 for email-less (phone-auth) user with empty email string", async () => {
@@ -86,6 +101,11 @@ describe("GET /api/me — auth middleware", () => {
     });
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ userId: "phone-user-uuid", email: "" });
+    expect(body).toEqual({
+      userId: "phone-user-uuid",
+      email: "",
+      displayName: null,
+      avatarUrl: null,
+    });
   });
 });

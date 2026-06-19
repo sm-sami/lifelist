@@ -16,7 +16,13 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated, { FadeIn, SlideInDown, SlideOutDown } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  SlideInDown,
+  SlideOutDown,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Status = "idle" | "checking" | "duplicate" | "submitting";
@@ -109,7 +115,11 @@ export default function AddItemModal() {
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      <Animated.View entering={FadeIn} style={StyleSheet.absoluteFill}>
+      <Animated.View
+        entering={FadeIn.duration(260)}
+        exiting={FadeOut.duration(200)}
+        style={StyleSheet.absoluteFill}
+      >
         <Pressable style={StyleSheet.absoluteFill} onPress={dismiss}>
           <BlurView
             tint="dark"
@@ -124,8 +134,8 @@ export default function AddItemModal() {
         style={styles.kav}
       >
         <Animated.View
-          entering={SlideInDown.springify().damping(18)}
-          exiting={SlideOutDown}
+          entering={SlideInDown.duration(340).easing(Easing.out(Easing.cubic))}
+          exiting={SlideOutDown.duration(240).easing(Easing.in(Easing.cubic))}
           style={[
             styles.drawer,
             {
@@ -138,7 +148,7 @@ export default function AddItemModal() {
           ]}
         >
           <View style={[styles.grabber, { backgroundColor: colors.borderGlass }]} />
-          <Text style={[styles.heading, { color: colors.textPrimary }]}>Add to your Lifelist</Text>
+          <Text style={[styles.heading, { color: colors.textPrimary }]}>What is on your mind?</Text>
 
           <TextInput
             value={title}
@@ -215,10 +225,28 @@ export default function AddItemModal() {
 const styles = StyleSheet.create({
   kav: { flex: 1, justifyContent: "flex-end" },
   drawer: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1 },
-  grabber: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, marginBottom: 16 },
+  grabber: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 16,
+  },
   heading: { fontSize: 20, fontWeight: "800", marginBottom: 14 },
-  input: { fontSize: 18, minHeight: 56, lineHeight: 24, padding: 14, borderWidth: 1 },
-  hintRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10, minHeight: 18 },
+  input: {
+    fontSize: 18,
+    minHeight: 56,
+    lineHeight: 24,
+    padding: 14,
+    borderWidth: 1,
+  },
+  hintRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+    minHeight: 18,
+  },
   cta: { marginTop: 18, paddingVertical: 16, alignItems: "center" },
   ctaDisabled: { opacity: 0.4 },
   ctaText: { fontSize: 16, fontWeight: "800" },

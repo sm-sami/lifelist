@@ -19,7 +19,11 @@ export default function ProtectedLayout() {
       <Stack.Screen name="item/[id]" options={{ presentation: "card" }} />
       <Stack.Screen
         name="modals/add-item"
-        options={{ presentation: "transparentModal", animation: "fade" }}
+        options={{
+          presentation: "transparentModal",
+          animation: "none",
+          contentStyle: { backgroundColor: "transparent" },
+        }}
       />
     </Stack>
   );

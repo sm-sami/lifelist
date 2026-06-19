@@ -1,6 +1,6 @@
 import { apiFetch } from "@/lib/api/client";
 import { type Experience, ExperienceSchema } from "@lifelist/shared";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 
 const ExperiencesResponseSchema = z.object({ experiences: z.array(ExperienceSchema) });
@@ -9,15 +9,21 @@ interface State {
   experiences: Experience[];
   loading: boolean;
   error: boolean;
+  refetch: () => void;
 }
 
 export function useExperiences(query: string, location?: string | null): State {
-  const [state, setState] = useState<State>({ experiences: [], loading: true, error: false });
+  const [state, setState] = useState<Omit<State, "refetch">>({
+    experiences: [],
+    loading: true,
+    error: false,
+  });
+  const fetchRef = useRef<() => void>(() => {});
 
-  useEffect(() => {
+  const fetch = useCallback(() => {
     if (!query.trim()) {
       setState({ experiences: [], loading: false, error: false });
-      return;
+      return () => {};
     }
     const controller = new AbortController();
     const params = new URLSearchParams({ q: query, limit: "6" });
@@ -41,5 +47,17 @@ export function useExperiences(query: string, location?: string | null): State {
     return () => controller.abort();
   }, [query, location]);
 
-  return state;
+  useEffect(() => {
+    fetchRef.current = fetch;
+  }, [fetch]);
+
+  useEffect(() => {
+    return fetch();
+  }, [fetch]);
+
+  const refetch = useCallback(() => {
+    fetchRef.current();
+  }, []);
+
+  return { ...state, refetch };
 }

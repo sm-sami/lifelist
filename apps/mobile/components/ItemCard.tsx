@@ -3,9 +3,67 @@ import type { Item } from "@/store/items";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import { DustyOverlay } from "./DustyOverlay";
-import { GlassContainer } from "./GlassContainer";
+
+function SkeletonCard({ width, height }: { width: number; height: number }) {
+  const { colors, radius } = useTheme();
+  const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withSequence(withTiming(0.4, { duration: 800 }), withTiming(1, { duration: 800 })),
+      -1,
+      false,
+    );
+  }, [opacity]);
+
+  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  const shimmer = colors.surfaceTint;
+  const lighter = colors.borderGlass;
+
+  return (
+    <Animated.View
+      style={[
+        animStyle,
+        {
+          width,
+          height,
+          borderRadius: radius.lg,
+          overflow: "hidden",
+          backgroundColor: shimmer,
+        },
+      ]}
+    >
+      {/* image area — top 65% */}
+      <View style={{ flex: 1, backgroundColor: lighter }} />
+      {/* meta area — bottom 35% */}
+      <View style={{ padding: 10, gap: 6 }}>
+        {/* chip placeholder */}
+        <View
+          style={{
+            height: 8,
+            width: "45%",
+            borderRadius: 4,
+            backgroundColor: lighter,
+          }}
+        />
+        {/* title line 1 */}
+        <View style={{ height: 12, width: "90%", borderRadius: 4, backgroundColor: lighter }} />
+        {/* title line 2 */}
+        <View style={{ height: 12, width: "65%", borderRadius: 4, backgroundColor: lighter }} />
+      </View>
+    </Animated.View>
+  );
+}
 
 export function ItemCard({ item, width, height }: { item: Item; width: number; height: number }) {
   const router = useRouter();
@@ -18,13 +76,7 @@ export function ItemCard({ item, width, height }: { item: Item; width: number; h
       : [colors.accentDim, colors.canvas];
 
   if (isPending) {
-    return (
-      <View style={{ width, height }}>
-        <GlassContainer staticFallback style={{ flex: 1 }}>
-          <View style={{ flex: 1, backgroundColor: colors.surfaceTint, borderRadius: radius.md }} />
-        </GlassContainer>
-      </View>
-    );
+    return <SkeletonCard width={width} height={height} />;
   }
 
   return (
