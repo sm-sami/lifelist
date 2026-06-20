@@ -2,6 +2,7 @@ import { ExperienceCard } from "@/components/ExperienceCard";
 import { HoldToStampButton } from "@/components/HoldToStampButton";
 import { ParallaxScrollView } from "@/components/ParallaxScrollView";
 import { EmptyIllustration, ErrorIllustration } from "@/components/SheetIllustration";
+import { SouvenirPhotoButton } from "@/components/SouvenirPhotoButton";
 import { useExperiences } from "@/hooks/useExperiences";
 import { deleteItem } from "@/lib/api/items";
 import { useTheme } from "@/lib/useTheme";
@@ -257,6 +258,10 @@ export default function ItemDetail() {
         ) : null}
 
         <HoldToStampButton itemId={item.id} completed={isCompleted} />
+
+        {isCompleted ? (
+          <SouvenirPhotoButton itemId={item.id} souvenirImageUrl={item.souvenirImageUrl} />
+        ) : null}
 
         <View style={{ height: 380 }} />
       </ParallaxScrollView>

@@ -183,24 +183,74 @@ itemsRoutes.patch("/:id/image", zValidator("json", imageSchema), async (c) => {
   return c.json({ item: await toItemDto(row, row.category ?? null) });
 });
 
+itemsRoutes.patch("/:id/souvenir-image", zValidator("json", imageSchema), async (c) => {
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+  const { imagePath } = c.req.valid("json");
+
+  const expectedPrefix = `${userId}/${id}/`;
+  const filename = imagePath.slice(expectedPrefix.length);
+  const basename = filename.replace(ALLOWED_EXT, "");
+  if (
+    !imagePath.startsWith(expectedPrefix) ||
+    !UUID_V4.test(basename) ||
+    !ALLOWED_EXT.test(filename)
+  ) {
+    return c.json({ error: "invalid_image_path" }, 400);
+  }
+  if (!(await storedImageExists(imagePath))) {
+    return c.json({ error: "uploaded_image_not_found" }, 400);
+  }
+
+  const previousPath = await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ status: items.status, souvenirImageUrl: items.souvenirImageUrl })
+      .from(items)
+      .where(and(eq(items.id, id), eq(items.userId, userId)))
+      .for("update");
+    if (!current) return undefined;
+    if (current.status !== "completed") return "not_completed" as const;
+
+    await tx
+      .update(items)
+      .set({
+        souvenirImageUrl: imagePath,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(items.id, id), eq(items.userId, userId)));
+    return current.souvenirImageUrl;
+  });
+  if (previousPath === undefined) return c.json({ error: "not_found" }, 404);
+  if (previousPath === "not_completed") return c.json({ error: "item_not_completed" }, 409);
+
+  if (previousPath !== imagePath) await deleteStoredImage(previousPath);
+
+  const row = await db.query.items.findFirst({
+    where: and(eq(items.id, id), eq(items.userId, userId)),
+    with: { category: true },
+  });
+  if (!row) return c.json({ error: "not_found" }, 404);
+  return c.json({ item: await toItemDto(row, row.category ?? null) });
+});
+
 itemsRoutes.delete("/:id", async (c) => {
   const userId = c.get("userId");
   const id = c.req.param("id");
 
   const previousPath = await db.transaction(async (tx) => {
     const [current] = await tx
-      .select({ imageUrl: items.imageUrl })
+      .select({ imageUrl: items.imageUrl, souvenirImageUrl: items.souvenirImageUrl })
       .from(items)
       .where(and(eq(items.id, id), eq(items.userId, userId)))
       .for("update");
     if (!current) return undefined;
 
     await tx.delete(items).where(and(eq(items.id, id), eq(items.userId, userId)));
-    return current.imageUrl;
+    return [current.imageUrl, current.souvenirImageUrl] as const;
   });
 
   if (previousPath === undefined) return c.json({ error: "not_found" }, 404);
-  await deleteStoredImage(previousPath);
+  await Promise.all(previousPath.map((path) => deleteStoredImage(path)));
 
   return c.body(null, 204);
 });

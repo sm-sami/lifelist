@@ -10,6 +10,7 @@ describe("shared DTO schemas", () => {
       imageUrl: null,
       imageAttribution: null,
       imageAttributionUrl: null,
+      souvenirImageUrl: null,
       experienceSearchQuery: "Northern Lights",
       experienceLocation: "Tromso, Norway",
       status: "pending_enrichment",

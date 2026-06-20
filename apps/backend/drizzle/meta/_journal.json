@@ -50,6 +50,13 @@
       "when": 1781901000000,
       "tag": "0006_add_experience_search_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781971200000,
+      "tag": "0007_add_souvenir_image",
+      "breakpoints": true
     }
   ]
 }

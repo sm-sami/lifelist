@@ -73,3 +73,11 @@ export async function setItemImage(itemId: string, imagePath: string): Promise<I
   });
   return ItemDtoSchema.parse(item);
 }
+
+export async function setItemSouvenirImage(itemId: string, imagePath: string): Promise<Item> {
+  const { item } = await apiJson<{ item: unknown }>(`/items/${itemId}/souvenir-image`, {
+    method: "PATCH",
+    body: JSON.stringify({ imagePath }),
+  });
+  return ItemDtoSchema.parse(item);
+}

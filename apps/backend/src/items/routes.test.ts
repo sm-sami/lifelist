@@ -66,6 +66,7 @@ const FAKE_ITEM = {
   imageUrl: null,
   imageAttribution: null,
   imageAttributionUrl: null,
+  souvenirImageUrl: null,
   experienceSearchQuery: null,
   experienceLocation: null,
   status: "pending_enrichment" as const,
@@ -83,6 +84,7 @@ const FAKE_DTO = {
   imageUrl: null,
   imageAttribution: null,
   imageAttributionUrl: null,
+  souvenirImageUrl: null,
   experienceSearchQuery: null,
   experienceLocation: null,
   status: "pending_enrichment",
@@ -306,15 +308,18 @@ describe("PATCH /api/items/:id/complete", () => {
 
 // ── DELETE /api/items/:id ─────────────────────────────────────────────────────
 describe("DELETE /api/items/:id", () => {
-  it("deletes the owned item and removes a stored image path", async () => {
+  it("deletes the owned item and removes stored image paths", async () => {
     const storedPath = "user-001/item-001/photo.jpg";
+    const souvenirPath = "user-001/item-001/souvenir.jpg";
     anyDb.transaction.mockImplementationOnce(
-      async (fn: (tx: unknown) => Promise<string | null | undefined>) => {
+      async (fn: (tx: unknown) => Promise<readonly [string | null, string | null] | undefined>) => {
         const fakeTx = {
           select: vi.fn().mockReturnValue({
             from: vi.fn().mockReturnValue({
               where: vi.fn().mockReturnValue({
-                for: vi.fn().mockResolvedValue([{ imageUrl: storedPath }]),
+                for: vi
+                  .fn()
+                  .mockResolvedValue([{ imageUrl: storedPath, souvenirImageUrl: souvenirPath }]),
               }),
             }),
           }),
@@ -331,11 +336,12 @@ describe("DELETE /api/items/:id", () => {
 
     expect(res.status).toBe(204);
     expect(mockDeleteStoredImage).toHaveBeenCalledWith(storedPath);
+    expect(mockDeleteStoredImage).toHaveBeenCalledWith(souvenirPath);
   });
 
   it("returns 404 when the item is not owned or does not exist", async () => {
     anyDb.transaction.mockImplementationOnce(
-      async (fn: (tx: unknown) => Promise<string | null | undefined>) => {
+      async (fn: (tx: unknown) => Promise<readonly [string | null, string | null] | undefined>) => {
         const fakeTx = {
           select: vi.fn().mockReturnValue({
             from: vi.fn().mockReturnValue({
@@ -353,6 +359,88 @@ describe("DELETE /api/items/:id", () => {
 
     expect(res.status).toBe(404);
     expect(mockDeleteStoredImage).not.toHaveBeenCalled();
+  });
+});
+
+// ── PATCH /api/items/:id/souvenir-image ───────────────────────────────────────
+describe("PATCH /api/items/:id/souvenir-image", () => {
+  const VALID_UUID = "550e8400-e29b-41d4-a716-446655440000";
+  const userId = "user-001";
+  const itemId = "item-001";
+  const validPath = `${userId}/${itemId}/${VALID_UUID}.jpg`;
+
+  it("returns 409 when the item is not completed", async () => {
+    mockStoredImageExists.mockResolvedValueOnce(true);
+    anyDb.transaction.mockImplementationOnce(
+      async (fn: (tx: unknown) => Promise<string | "not_completed" | undefined>) => {
+        const fakeTx = {
+          select: vi.fn().mockReturnValue({
+            from: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                for: vi.fn().mockResolvedValue([{ status: "active", souvenirImageUrl: null }]),
+              }),
+            }),
+          }),
+        };
+        return fn(fakeTx);
+      },
+    );
+
+    const res = await makeApp(userId).request(`/api/items/${itemId}/souvenir-image`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imagePath: validPath }),
+    });
+
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("item_not_completed");
+  });
+
+  it("updates the souvenir image for a completed item", async () => {
+    const oldPath = `${userId}/${itemId}/old-souvenir.jpg`;
+    mockStoredImageExists.mockResolvedValueOnce(true);
+    anyDb.transaction.mockImplementationOnce(
+      async (fn: (tx: unknown) => Promise<string | "not_completed" | undefined>) => {
+        const fakeTx = {
+          select: vi.fn().mockReturnValue({
+            from: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                for: vi
+                  .fn()
+                  .mockResolvedValue([{ status: "completed", souvenirImageUrl: oldPath }]),
+              }),
+            }),
+          }),
+          update: vi.fn().mockReturnValue({
+            set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+          }),
+        };
+        return fn(fakeTx);
+      },
+    );
+    mockDeleteStoredImage.mockResolvedValueOnce(undefined);
+    anyDb.query.items.findFirst.mockResolvedValueOnce({
+      ...FAKE_ITEM,
+      status: "completed",
+      souvenirImageUrl: validPath,
+      category: null,
+    });
+    mockToItemDto.mockResolvedValueOnce({
+      ...FAKE_DTO,
+      status: "completed",
+      souvenirImageUrl: "https://signed.url/souvenir.jpg",
+    } as never);
+
+    const res = await makeApp(userId).request(`/api/items/${itemId}/souvenir-image`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imagePath: validPath }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockDeleteStoredImage).toHaveBeenCalledWith(oldPath);
+    const body = await res.json();
+    expect(body.item.souvenirImageUrl).toBe("https://signed.url/souvenir.jpg");
   });
 });
 

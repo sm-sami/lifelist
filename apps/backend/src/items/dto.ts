@@ -44,6 +44,7 @@ export async function toItemDto(item: Item, category: Category | null): Promise<
     imageUrl: await resolveImageUrl(item.imageUrl),
     imageAttribution: item.imageAttribution,
     imageAttributionUrl: item.imageAttributionUrl,
+    souvenirImageUrl: await resolveImageUrl(item.souvenirImageUrl),
     experienceSearchQuery: item.experienceSearchQuery,
     experienceLocation: item.experienceLocation,
     status: item.status,

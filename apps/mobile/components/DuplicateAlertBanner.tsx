@@ -1,6 +1,5 @@
 import type { DuplicateMatch } from "@/lib/api/items";
 import { useTheme } from "@/lib/useTheme";
-import { Sparkles } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInUp, FadeOutUp } from "react-native-reanimated";
 
@@ -28,18 +27,6 @@ export function DuplicateAlertBanner({ match, onViewExisting, onAddAnyway }: Pro
       ]}
     >
       <View style={styles.headerRow}>
-        <View
-          style={[
-            styles.iconWrap,
-            {
-              backgroundColor: colors.surfaceTint,
-              borderColor: colors.borderGlass,
-              borderRadius: radius.md,
-            },
-          ]}
-        >
-          <Sparkles size={18} color={colors.accentText} />
-        </View>
         <View style={styles.copy}>
           <View style={styles.titleRow}>
             <Text style={[type.headingSmall, { color: colors.textPrimary }]}>
@@ -107,15 +94,7 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: "row",
-    gap: 12,
     alignItems: "flex-start",
-  },
-  iconWrap: {
-    width: 38,
-    height: 38,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
   },
   copy: { flex: 1, minWidth: 0 },
   titleRow: {

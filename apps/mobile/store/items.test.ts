@@ -29,6 +29,7 @@ function item(overrides: Partial<Item> = {}): Item {
     imageUrl: null,
     imageAttribution: null,
     imageAttributionUrl: null,
+    souvenirImageUrl: null,
     experienceSearchQuery: null,
     experienceLocation: null,
     status: "pending_enrichment",

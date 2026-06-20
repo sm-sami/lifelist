@@ -9,7 +9,7 @@ const migrationFiles = readdirSync(migrationDirectory)
 
 describe("initial database migration", () => {
   it("contains the manually maintained database invariants", () => {
-    expect(migrationFiles).toHaveLength(7);
+    expect(migrationFiles).toHaveLength(8);
 
     const migration = readFileSync(join(migrationDirectory, migrationFiles[0]), "utf8");
 
@@ -113,5 +113,13 @@ describe("experience search metadata migration", () => {
 
     expect(migration).toContain("experience_search_query text");
     expect(migration).toContain("experience_location text");
+  });
+});
+
+describe("souvenir image migration", () => {
+  it("adds a separate completed-item souvenir image column", () => {
+    const migration = readFileSync(join(migrationDirectory, migrationFiles[7]), "utf8");
+
+    expect(migration).toContain("souvenir_image_url text");
   });
 });

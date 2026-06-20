@@ -27,6 +27,7 @@ export const ItemDtoSchema = z.object({
   imageUrl: z.string().nullable(),
   imageAttribution: z.string().nullable(),
   imageAttributionUrl: z.string().nullable(),
+  souvenirImageUrl: z.string().nullable(),
   experienceSearchQuery: z.string().nullable(),
   experienceLocation: z.string().nullable(),
   status: z.enum(["pending_enrichment", "active", "completed"]),
