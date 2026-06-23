@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import { canonicalizeBucketTitle } from "./title";
 
 function requireEnv(name: string): string {
   const v = process.env[name];
@@ -13,12 +12,12 @@ const EXPECTED_DIMS = 1536;
 
 const openai = new OpenAI({ apiKey: requireEnv("OPENAI_API_KEY") });
 
-export function normalizeTitle(title: string): string {
-  return canonicalizeBucketTitle(title);
+export function normalizeEmbeddingInput(value: string): string {
+  return value.trim().normalize("NFKC").replace(/\s+/g, " ");
 }
 
 export async function embed(text: string): Promise<number[]> {
-  const input = normalizeTitle(text);
+  const input = normalizeEmbeddingInput(text);
   const res = await openai.embeddings.create({
     model: MODEL,
     input,

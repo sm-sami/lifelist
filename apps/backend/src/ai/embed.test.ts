@@ -15,27 +15,13 @@ vi.mock("openai", () => {
 // Set the env var before the dynamic import so requireEnv() doesn't throw.
 vi.stubEnv("OPENAI_API_KEY", "test-key");
 
-const { normalizeTitle, embed } = await import("./embed");
+const { normalizeEmbeddingInput, embed } = await import("./embed");
 
-describe("normalizeTitle", () => {
-  it("lowercases, trims, and removes leading bucket-list intent", () => {
-    expect(normalizeTitle("  Visit PARIS  ")).toBe("paris");
-  });
-
-  it("collapses known aliases before embedding", () => {
-    expect(normalizeTitle("see  the   northern   lights")).toBe("northern lights");
-    expect(normalizeTitle("Experience aurora borealis")).toBe("northern lights");
-    expect(normalizeTitle("Visit the tallest building")).toBe("burj khalifa");
-  });
-
-  it("strips trailing punctuation", () => {
-    expect(normalizeTitle("Climb Everest!")).toBe("everest");
-    expect(normalizeTitle("Travel to Japan.")).toBe("japan");
-    expect(normalizeTitle("Run a marathon?")).toBe("run a marathon");
-  });
-
-  it("removes punctuation for embedding stability", () => {
-    expect(normalizeTitle("St. Moritz")).toBe("st moritz");
+describe("normalizeEmbeddingInput", () => {
+  it("only applies mechanical Unicode and whitespace normalization", () => {
+    expect(normalizeEmbeddingInput("  action: visit\n subject:  Burj Khalifa  ")).toBe(
+      "action: visit subject: Burj Khalifa",
+    );
   });
 });
 
@@ -55,9 +41,9 @@ describe("embed", () => {
     expect(vec).toHaveLength(1536);
   });
 
-  it("normalizes the input before embedding", async () => {
-    await embed("  CLIMB Everest!  ");
+  it("mechanically normalizes the semantic input before embedding", async () => {
+    await embed("  subject:  Mount Everest  ");
     const callArg = mockCreate.mock.calls.at(-1)?.[0] as { input: string };
-    expect(callArg.input).toBe("everest");
+    expect(callArg.input).toBe("subject: Mount Everest");
   });
 });

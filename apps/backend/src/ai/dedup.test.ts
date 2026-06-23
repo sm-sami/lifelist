@@ -9,10 +9,9 @@ vi.mock("./embed", () => ({
 }));
 
 import { db } from "../../db/client";
-import { findSemanticDuplicate, findTitleDuplicate } from "./dedup";
+import { findDuplicateCandidates, findSemanticKeyDuplicate } from "./dedup";
 
 const mockExecute = vi.mocked(db.execute);
-
 const QUERY_VEC = new Array(1536).fill(0.1);
 const USER_ID = "user-uuid-001";
 
@@ -20,68 +19,61 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("findSemanticDuplicate", () => {
-  it("returns null when no rows found", async () => {
-    mockExecute.mockResolvedValueOnce([] as never);
-    const result = await findSemanticDuplicate(USER_ID, QUERY_VEC);
-    expect(result).toBeNull();
-  });
-
-  it("returns null when nearest row is beyond the distance threshold", async () => {
+describe("findDuplicateCandidates", () => {
+  it("returns plausible candidates and discards distant rows", async () => {
     mockExecute.mockResolvedValueOnce([
-      { id: "item-1", title: "Learn to surf", distance: 0.5 },
+      {
+        id: "item-1",
+        title: "See the Northern Lights",
+        semantic_data: null,
+        distance: 0.12,
+      },
+      {
+        id: "item-2",
+        title: "Learn to surf",
+        semantic_data: null,
+        distance: 0.7,
+      },
     ] as never);
-    const result = await findSemanticDuplicate(USER_ID, QUERY_VEC);
-    expect(result).toBeNull();
+
+    const result = await findDuplicateCandidates(USER_ID, QUERY_VEC);
+    expect(result).toEqual([
+      {
+        id: "item-1",
+        title: "See the Northern Lights",
+        semanticData: null,
+        distance: 0.12,
+        similarity: 0.88,
+      },
+    ]);
   });
 
-  it("returns the match when nearest row is within the threshold", async () => {
-    mockExecute.mockResolvedValueOnce([
-      { id: "item-2", title: "See the Northern Lights", distance: 0.08 },
-    ] as never);
-    const result = await findSemanticDuplicate(USER_ID, QUERY_VEC);
-    expect(result).toMatchObject({
-      id: "item-2",
-      title: "See the Northern Lights",
-      distance: 0.08,
-      similarity: 0.92,
-    });
-  });
-
-  it("accepts a custom executor (transaction handle)", async () => {
-    const txExecute = vi.fn().mockResolvedValue([]);
-    const tx = { execute: txExecute };
-    await findSemanticDuplicate(USER_ID, QUERY_VEC, tx);
-    expect(txExecute).toHaveBeenCalledOnce();
+  it("accepts a transaction executor", async () => {
+    const execute = vi.fn().mockResolvedValue([]);
+    await findDuplicateCandidates(USER_ID, QUERY_VEC, { execute });
+    expect(execute).toHaveBeenCalledOnce();
     expect(mockExecute).not.toHaveBeenCalled();
   });
 });
 
-describe("findTitleDuplicate", () => {
-  it("returns null when no canonical title matches", async () => {
-    mockExecute.mockResolvedValueOnce([{ id: "item-1", title: "Swim with dolphins" }] as never);
-    const result = await findTitleDuplicate(USER_ID, "Northern lights");
-    expect(result).toBeNull();
+describe("findSemanticKeyDuplicate", () => {
+  it("does not query for a low-confidence null key", async () => {
+    expect(await findSemanticKeyDuplicate(USER_ID, null)).toBeNull();
+    expect(mockExecute).not.toHaveBeenCalled();
   });
 
-  it("matches Northern lights against See the Northern Lights", async () => {
+  it("returns an exact semantic-key match", async () => {
     mockExecute.mockResolvedValueOnce([
-      { id: "item-2", title: "See the Northern Lights" },
+      { id: "item-1", title: "See the Northern Lights" },
     ] as never);
-    const result = await findTitleDuplicate(USER_ID, "Northern lights");
-    expect(result).toMatchObject({
-      id: "item-2",
+
+    expect(
+      await findSemanticKeyDuplicate(USER_ID, "natural-phenomenon:northern-lights"),
+    ).toMatchObject({
+      id: "item-1",
       title: "See the Northern Lights",
       distance: 0,
       similarity: 1,
     });
-  });
-
-  it("matches aurora borealis against northern lights", async () => {
-    mockExecute.mockResolvedValueOnce([
-      { id: "item-2", title: "See the Northern Lights" },
-    ] as never);
-    const result = await findTitleDuplicate(USER_ID, "Experience aurora borealis");
-    expect(result?.id).toBe("item-2");
   });
 });

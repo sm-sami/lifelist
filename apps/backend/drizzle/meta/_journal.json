@@ -57,6 +57,13 @@
       "when": 1781971200000,
       "tag": "0007_add_souvenir_image",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1781974800000,
+      "tag": "0008_add_item_semantics",
+      "breakpoints": true
     }
   ]
 }

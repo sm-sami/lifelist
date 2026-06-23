@@ -1,11 +1,22 @@
+import { createHash } from "node:crypto";
 import { zValidator } from "@hono/zod-validator";
 import { waitUntil } from "@vercel/functions";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { db } from "../../db/client";
-import { items } from "../../db/schema";
-import { findSemanticDuplicate, findTitleDuplicate } from "../ai/dedup";
+import { categories, itemAnalysisCache, items } from "../../db/schema";
+import {
+  ITEM_ANALYSIS_MODEL,
+  ITEM_ANALYSIS_VERSION,
+  type SemanticItem,
+  SemanticItemSchema,
+  analyzeItem,
+  buildEmbeddingInput,
+  buildSemanticKey,
+} from "../ai/analyze-item";
+import { findDuplicateCandidates, findSemanticKeyDuplicate } from "../ai/dedup";
+import { verifyDuplicateCandidates } from "../ai/duplicate-verifier";
 import { EMBEDDING_MODEL, embed } from "../ai/embed";
 import { DuplicateItemError } from "../ai/errors";
 import { rateLimit } from "../middleware/rate-limit";
@@ -29,20 +40,117 @@ const imageSchema = z.object({
   imagePath: z.string().trim().max(512),
 });
 
+interface PreparedItem {
+  analysis: SemanticItem;
+  semanticKey: string | null;
+  embedding: number[];
+}
+
+async function prepareItem(userId: string, title: string): Promise<PreparedItem> {
+  const titleHash = createHash("sha256")
+    .update(title.trim().normalize("NFKC").replace(/\s+/g, " ").toLowerCase())
+    .digest("hex");
+  const cached = await db.query.itemAnalysisCache.findFirst({
+    where: and(
+      eq(itemAnalysisCache.userId, userId),
+      eq(itemAnalysisCache.titleHash, titleHash),
+      eq(itemAnalysisCache.analysisModel, ITEM_ANALYSIS_MODEL),
+      eq(itemAnalysisCache.analysisVersion, ITEM_ANALYSIS_VERSION),
+      eq(itemAnalysisCache.embeddingModel, EMBEDDING_MODEL),
+      gt(itemAnalysisCache.expiresAt, new Date()),
+    ),
+  });
+  if (cached) {
+    const parsed = SemanticItemSchema.safeParse(cached.semanticData);
+    if (parsed.success) {
+      return {
+        analysis: parsed.data,
+        semanticKey: cached.semanticKey,
+        embedding: cached.embedding,
+      };
+    }
+  }
+
+  const existingCategories = await db
+    .select({ id: categories.id, name: categories.name })
+    .from(categories)
+    .where(eq(categories.userId, userId));
+  const analysis = await analyzeItem({ title, existingCategories });
+  const semanticKey = buildSemanticKey(analysis);
+  const embedding = await embed(buildEmbeddingInput(analysis));
+  await db
+    .insert(itemAnalysisCache)
+    .values({
+      userId,
+      titleHash,
+      semanticData: analysis,
+      semanticKey,
+      embedding,
+      embeddingModel: EMBEDDING_MODEL,
+      analysisModel: ITEM_ANALYSIS_MODEL,
+      analysisVersion: ITEM_ANALYSIS_VERSION,
+      expiresAt: new Date(Date.now() + 15 * 60_000),
+    })
+    .onConflictDoUpdate({
+      target: [itemAnalysisCache.userId, itemAnalysisCache.titleHash],
+      set: {
+        semanticData: analysis,
+        semanticKey,
+        embedding,
+        embeddingModel: EMBEDDING_MODEL,
+        analysisModel: ITEM_ANALYSIS_MODEL,
+        analysisVersion: ITEM_ANALYSIS_VERSION,
+        expiresAt: new Date(Date.now() + 15 * 60_000),
+      },
+    });
+  return { analysis, semanticKey, embedding };
+}
+
+async function detectDuplicate(
+  userId: string,
+  prepared: PreparedItem,
+): Promise<Awaited<ReturnType<typeof findSemanticKeyDuplicate>>> {
+  const exact = await findSemanticKeyDuplicate(userId, prepared.semanticKey);
+  if (exact) return exact;
+
+  const candidates = await findDuplicateCandidates(userId, prepared.embedding);
+  if (candidates.length === 0) return null;
+
+  const decision = await verifyDuplicateCandidates(prepared.analysis, candidates);
+  if (
+    decision.relationship !== "same_goal" ||
+    decision.confidence < 0.85 ||
+    !decision.candidateId
+  ) {
+    return null;
+  }
+
+  const match = candidates.find((candidate) => candidate.id === decision.candidateId);
+  if (!match) return null;
+  return {
+    id: match.id,
+    title: match.title,
+    distance: match.distance,
+    similarity: Math.max(match.similarity, Number(decision.confidence.toFixed(4))),
+  };
+}
+
 itemsRoutes.post("/create", zValidator("json", createSchema), async (c) => {
   const userId = c.get("userId");
   const { title, notes, force } = c.req.valid("json");
 
-  const queryEmbedding = await embed(title);
+  const prepared = await prepareItem(userId, title);
+  if (!force) {
+    const duplicate = await detectDuplicate(userId, prepared);
+    if (duplicate) throw new DuplicateItemError(duplicate);
+  }
 
   const created = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${userId}))`);
 
     if (!force) {
-      const dup =
-        (await findTitleDuplicate(userId, title, tx)) ??
-        (await findSemanticDuplicate(userId, queryEmbedding, tx));
-      if (dup) throw new DuplicateItemError(dup);
+      const exact = await findSemanticKeyDuplicate(userId, prepared.semanticKey, tx);
+      if (exact) throw new DuplicateItemError(exact);
     }
 
     const [row] = await tx
@@ -51,7 +159,15 @@ itemsRoutes.post("/create", zValidator("json", createSchema), async (c) => {
         userId,
         title,
         notes: notes ?? null,
-        embedding: queryEmbedding,
+        canonicalTitle: prepared.analysis.canonicalTitle,
+        semanticKey: force ? null : prepared.semanticKey,
+        semanticData: prepared.analysis,
+        semanticConfidence: prepared.analysis.entityConfidence,
+        semanticVersion: ITEM_ANALYSIS_VERSION,
+        normalizerModel: ITEM_ANALYSIS_MODEL,
+        experienceSearchQuery: prepared.analysis.experienceSearchQuery,
+        experienceLocation: prepared.analysis.experienceLocation,
+        embedding: prepared.embedding,
         embeddingModel: EMBEDDING_MODEL,
         status: "pending_enrichment",
       })
@@ -59,7 +175,7 @@ itemsRoutes.post("/create", zValidator("json", createSchema), async (c) => {
     return row;
   });
 
-  waitUntil(enrichItem(userId, created.id, title));
+  waitUntil(enrichItem(userId, created.id, prepared.analysis));
 
   return c.json({ item: await toItemDto(created, null) }, 201);
 });
@@ -69,19 +185,8 @@ const precheckSchema = z.object({ title: z.string().trim().min(1).max(140) });
 itemsRoutes.get("/precheck", zValidator("query", precheckSchema), async (c) => {
   const userId = c.get("userId");
   const { title } = c.req.valid("query");
-  const titleDup = await findTitleDuplicate(userId, title);
-  if (titleDup) {
-    return c.json(
-      {
-        error: "duplicate_item",
-        match: { id: titleDup.id, title: titleDup.title, similarity: titleDup.similarity },
-      },
-      409,
-    );
-  }
-
-  const queryEmbedding = await embed(title);
-  const dup = await findSemanticDuplicate(userId, queryEmbedding);
+  const prepared = await prepareItem(userId, title);
+  const dup = await detectDuplicate(userId, prepared);
   if (dup) {
     return c.json(
       {

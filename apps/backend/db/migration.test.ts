@@ -9,7 +9,7 @@ const migrationFiles = readdirSync(migrationDirectory)
 
 describe("initial database migration", () => {
   it("contains the manually maintained database invariants", () => {
-    expect(migrationFiles).toHaveLength(8);
+    expect(migrationFiles).toHaveLength(9);
 
     const migration = readFileSync(join(migrationDirectory, migrationFiles[0]), "utf8");
 
@@ -121,5 +121,26 @@ describe("souvenir image migration", () => {
     const migration = readFileSync(join(migrationDirectory, migrationFiles[7]), "utf8");
 
     expect(migration).toContain("souvenir_image_url text");
+  });
+});
+
+describe("item semantics migration", () => {
+  it("adds semantic metadata and race-safe high-confidence keys", () => {
+    const migration = readFileSync(join(migrationDirectory, migrationFiles[8]), "utf8");
+
+    expect(migration).toContain("canonical_title text");
+    expect(migration).toContain("semantic_key text");
+    expect(migration).toContain("semantic_data jsonb");
+    expect(migration).toContain("semantic_confidence real");
+    expect(migration).toContain("semantic_version integer");
+    expect(migration).toContain("normalizer_model text");
+    expect(migration).toContain("items_user_semantic_key_unique_idx");
+    expect(migration).toContain("where semantic_key is not null");
+    expect(migration).toContain("create table if not exists public.item_analysis_cache");
+    expect(migration).toContain("item_analysis_cache_user_title_unique_idx");
+    expect(migration).toContain("alter table public.item_analysis_cache enable row level security");
+    expect(migration).toContain(
+      "revoke all privileges on table public.item_analysis_cache from anon, authenticated",
+    );
   });
 });

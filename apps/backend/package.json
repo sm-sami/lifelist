@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "tsx --env-file=.env.local db/migrate.ts",
+    "db:backfill-semantics": "tsx --env-file=.env.local db/backfill-item-semantics.ts",
     "db:push": "drizzle-kit push --config=drizzle.config.ts",
     "db:studio": "drizzle-kit studio --config=drizzle.config.ts",
     "typecheck": "tsc --noEmit",

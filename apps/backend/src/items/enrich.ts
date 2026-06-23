@@ -1,50 +1,30 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../../db/client";
 import { categories, items } from "../../db/schema";
-import { classifyItem } from "../ai/classify";
-import { getDeterministicItemMetadata } from "../ai/title";
+import type { SemanticItem } from "../ai/analyze-item";
 import { generateGradient, slugify } from "../services/gradient";
 import { broadcastItemEnriched } from "../services/realtime";
 import { searchPortraitImage, triggerUnsplashDownload } from "../services/unsplash";
 import { toItemDto } from "./dto";
 
-async function resolveCategory(
-  userId: string,
-  title: string,
-): Promise<{
-  categoryId: string;
-  keywords: string[];
-  experienceSearchQuery: string | null;
-  experienceLocation: string | null;
-}> {
+async function resolveCategory(userId: string, analysis: SemanticItem): Promise<string> {
   const existing = await db
     .select({ id: categories.id, name: categories.name, slug: categories.slug })
     .from(categories)
     .where(eq(categories.userId, userId));
 
-  const result = await classifyItem({
-    title,
-    existingCategories: existing.map((c) => ({ id: c.id, name: c.name })),
-  });
-  const deterministic = getDeterministicItemMetadata(title);
-  const metadata = {
-    keywords: deterministic?.imageKeywords ?? result.imageKeywords,
-    experienceSearchQuery: deterministic?.experienceSearchQuery ?? result.experienceSearchQuery,
-    experienceLocation:
-      deterministic && "experienceLocation" in deterministic
-        ? (deterministic.experienceLocation ?? null)
-        : result.experienceLocation,
-  };
-
-  if (result.matchedCategoryId) {
-    return { categoryId: result.matchedCategoryId, ...metadata };
+  if (
+    analysis.matchedCategoryId &&
+    existing.some((category) => category.id === analysis.matchedCategoryId)
+  ) {
+    return analysis.matchedCategoryId;
   }
 
-  const name = result.newCategoryName ?? "General";
+  const name = analysis.newCategoryName ?? "General";
   const slug = slugify(name) || "general";
 
   const dup = existing.find((c) => c.slug === slug);
-  if (dup) return { categoryId: dup.id, ...metadata };
+  if (dup) return dup.id;
 
   const gradient = generateGradient(name);
   const [created] = await db
@@ -56,23 +36,26 @@ async function resolveCategory(
     })
     .returning({ id: categories.id });
 
-  return { categoryId: created.id, ...metadata };
+  return created.id;
 }
 
-export async function enrichItem(userId: string, itemId: string, title: string): Promise<void> {
+export async function enrichItem(
+  userId: string,
+  itemId: string,
+  analysis: SemanticItem,
+): Promise<void> {
   try {
-    const { categoryId, keywords, experienceSearchQuery, experienceLocation } =
-      await resolveCategory(userId, title);
+    const categoryId = await resolveCategory(userId, analysis);
 
-    const pick = await searchPortraitImage(keywords);
+    const pick = await searchPortraitImage(analysis.imageKeywords);
     if (pick) await triggerUnsplashDownload(pick.downloadLocation);
 
     await db
       .update(items)
       .set({
         categoryId,
-        experienceSearchQuery,
-        experienceLocation,
+        experienceSearchQuery: analysis.experienceSearchQuery,
+        experienceLocation: analysis.experienceLocation,
         status: "active",
         updatedAt: new Date(),
       })

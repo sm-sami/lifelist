@@ -260,7 +260,13 @@ export default function ItemDetail() {
         <HoldToStampButton itemId={item.id} completed={isCompleted} />
 
         {isCompleted ? (
-          <SouvenirPhotoButton itemId={item.id} souvenirImageUrl={item.souvenirImageUrl} />
+          <SouvenirPhotoButton
+            itemId={item.id}
+            title={item.title}
+            categoryName={item.category?.name ?? null}
+            completedAt={item.completedAt}
+            souvenirImageUrl={item.souvenirImageUrl}
+          />
         ) : null}
 
         <View style={{ height: 380 }} />

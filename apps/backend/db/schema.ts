@@ -3,7 +3,10 @@ import {
   check,
   foreignKey,
   index,
+  integer,
+  jsonb,
   pgTable,
+  real,
   text,
   timestamp,
   uniqueIndex,
@@ -62,6 +65,12 @@ export const items = pgTable(
     imageAttribution: text("image_attribution"),
     imageAttributionUrl: text("image_attribution_url"),
     souvenirImageUrl: text("souvenir_image_url"),
+    canonicalTitle: text("canonical_title"),
+    semanticKey: text("semantic_key"),
+    semanticData: jsonb("semantic_data").$type<Record<string, unknown>>(),
+    semanticConfidence: real("semantic_confidence"),
+    semanticVersion: integer("semantic_version"),
+    normalizerModel: text("normalizer_model"),
     experienceSearchQuery: text("experience_search_query"),
     experienceLocation: text("experience_location"),
     status: text("status", {
@@ -79,6 +88,9 @@ export const items = pgTable(
     index("items_user_id_idx").on(table.userId),
     index("items_category_id_idx").on(table.categoryId),
     index("items_user_status_created_idx").on(table.userId, table.status, table.createdAt),
+    uniqueIndex("items_user_semantic_key_unique_idx")
+      .on(table.userId, table.semanticKey)
+      .where(sql`${table.semanticKey} is not null`),
     foreignKey({
       columns: [table.categoryId, table.userId],
       foreignColumns: [categories.id, categories.userId],
@@ -97,6 +109,29 @@ export const items = pgTable(
       "items_embedding_model_pair",
       sql`(${table.embedding} is null) = (${table.embeddingModel} is null)`,
     ),
+  ],
+);
+
+export const itemAnalysisCache = pgTable(
+  "item_analysis_cache",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    titleHash: text("title_hash").notNull(),
+    semanticData: jsonb("semantic_data").$type<Record<string, unknown>>().notNull(),
+    semanticKey: text("semantic_key"),
+    embedding: vector("embedding", { dimensions: 1536 }).notNull(),
+    embeddingModel: text("embedding_model").notNull(),
+    analysisModel: text("analysis_model").notNull(),
+    analysisVersion: integer("analysis_version").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("item_analysis_cache_user_title_unique_idx").on(table.userId, table.titleHash),
+    index("item_analysis_cache_expires_idx").on(table.expiresAt),
   ],
 );
 
@@ -130,3 +165,4 @@ export type Category = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
 export type Item = typeof items.$inferSelect;
 export type NewItem = typeof items.$inferInsert;
+export type ItemAnalysisCache = typeof itemAnalysisCache.$inferSelect;

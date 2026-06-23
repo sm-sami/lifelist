@@ -7,14 +7,29 @@ import type { AppEnv } from "../types";
 vi.mock("../../db/client", () => ({
   db: {
     transaction: vi.fn(),
-    query: { items: { findMany: vi.fn(), findFirst: vi.fn() } },
+    query: {
+      items: { findMany: vi.fn(), findFirst: vi.fn() },
+      itemAnalysisCache: { findFirst: vi.fn() },
+    },
+    select: vi.fn(),
     update: vi.fn(),
     insert: vi.fn(),
     execute: vi.fn(),
   },
 }));
+vi.mock("../ai/analyze-item", () => ({
+  analyzeItem: vi.fn(),
+  buildEmbeddingInput: vi.fn(() => "semantic embedding input"),
+  buildSemanticKey: vi.fn(() => "activity:inca-trail:peru"),
+  ITEM_ANALYSIS_MODEL: "test-analysis-model",
+  ITEM_ANALYSIS_VERSION: 1,
+}));
 vi.mock("../ai/embed", () => ({ embed: vi.fn(), EMBEDDING_MODEL: "text-embedding-3-small" }));
-vi.mock("../ai/dedup", () => ({ findSemanticDuplicate: vi.fn(), findTitleDuplicate: vi.fn() }));
+vi.mock("../ai/dedup", () => ({
+  findDuplicateCandidates: vi.fn(),
+  findSemanticKeyDuplicate: vi.fn(),
+}));
+vi.mock("../ai/duplicate-verifier", () => ({ verifyDuplicateCandidates: vi.fn() }));
 vi.mock("../middleware/rate-limit", () => ({
   rateLimit: () => async (_c: unknown, next: () => Promise<void>) => next(),
 }));
@@ -28,8 +43,10 @@ vi.mock("@vercel/functions", () => ({ waitUntil: vi.fn() }));
 
 // ── Import mocked modules ─────────────────────────────────────────────────────
 const { db } = await import("../../db/client");
+const { analyzeItem } = await import("../ai/analyze-item");
 const { embed } = await import("../ai/embed");
-const { findSemanticDuplicate, findTitleDuplicate } = await import("../ai/dedup");
+const { findDuplicateCandidates, findSemanticKeyDuplicate } = await import("../ai/dedup");
+const { verifyDuplicateCandidates } = await import("../ai/duplicate-verifier");
 const { toItemDto, storedImageExists, deleteStoredImage } = await import("./dto");
 const { enrichItem } = await import("./enrich");
 const { itemsRoutes } = await import("./routes");
@@ -37,9 +54,11 @@ const { itemsRoutes } = await import("./routes");
 // Drizzle's types are complex — cast via unknown so we can call vi.fn() methods.
 // biome-ignore lint/suspicious/noExplicitAny: test helper cast
 const anyDb = db as any;
+const mockAnalyzeItem = vi.mocked(analyzeItem);
 const mockEmbed = vi.mocked(embed);
-const mockDedup = vi.mocked(findSemanticDuplicate);
-const mockTitleDedup = vi.mocked(findTitleDuplicate);
+const mockCandidates = vi.mocked(findDuplicateCandidates);
+const mockSemanticKeyDup = vi.mocked(findSemanticKeyDuplicate);
+const mockVerifyDuplicate = vi.mocked(verifyDuplicateCandidates);
 const mockToItemDto = vi.mocked(toItemDto);
 const mockStoredImageExists = vi.mocked(storedImageExists);
 const mockDeleteStoredImage = vi.mocked(deleteStoredImage);
@@ -58,6 +77,21 @@ function makeApp(userId = "user-001") {
 }
 
 const FAKE_EMBEDDING = Array(1536).fill(0.1);
+const FAKE_ANALYSIS = {
+  canonicalTitle: "Hike the Inca Trail",
+  action: "do" as const,
+  subject: "Inca Trail",
+  subjectType: "activity" as const,
+  location: "Peru",
+  concepts: ["trekking", "hiking"],
+  entityConfidence: 0.98,
+  entityWasInferred: false,
+  matchedCategoryId: null,
+  newCategoryName: "Outdoor Adventure",
+  imageKeywords: ["Inca Trail", "Peru mountains"],
+  experienceSearchQuery: "Inca Trail",
+  experienceLocation: "Peru",
+};
 const FAKE_ITEM = {
   id: "item-001",
   userId: "user-001",
@@ -67,6 +101,12 @@ const FAKE_ITEM = {
   imageAttribution: null,
   imageAttributionUrl: null,
   souvenirImageUrl: null,
+  canonicalTitle: FAKE_ANALYSIS.canonicalTitle,
+  semanticKey: "activity:inca-trail:peru",
+  semanticData: FAKE_ANALYSIS,
+  semanticConfidence: 0.98,
+  semanticVersion: 1,
+  normalizerModel: "test-analysis-model",
   experienceSearchQuery: null,
   experienceLocation: null,
   status: "pending_enrichment" as const,
@@ -115,14 +155,24 @@ beforeEach(() => {
   // resetAllMocks clears both call history AND one-time return value queues,
   // preventing unconsumed mockResolvedValueOnce responses from bleeding between tests.
   vi.resetAllMocks();
+  anyDb.select.mockReturnValue({
+    from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }),
+  });
+  anyDb.query.itemAnalysisCache.findFirst.mockResolvedValue(undefined);
+  anyDb.insert.mockReturnValue({
+    values: vi.fn().mockReturnValue({
+      onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+    }),
+  });
+  mockAnalyzeItem.mockResolvedValue(FAKE_ANALYSIS);
+  mockEmbed.mockResolvedValue(FAKE_EMBEDDING);
+  mockSemanticKeyDup.mockResolvedValue(null);
+  mockCandidates.mockResolvedValue([]);
 });
 
 // ── POST /api/items/create ─────────────────────────────────────────────────────
 describe("POST /api/items/create", () => {
   it("creates an item and returns 201", async () => {
-    mockEmbed.mockResolvedValueOnce(FAKE_EMBEDDING);
-    mockTitleDedup.mockResolvedValueOnce(null);
-    mockDedup.mockResolvedValueOnce(null);
     anyDb.transaction.mockImplementationOnce(
       async (fn: (tx: unknown) => Promise<typeof FAKE_ITEM>) => fn(fakeInsertTx()),
     );
@@ -141,11 +191,17 @@ describe("POST /api/items/create", () => {
   });
 
   it("returns 409 when a semantic duplicate is found", async () => {
-    mockEmbed.mockResolvedValueOnce(FAKE_EMBEDDING);
-    anyDb.transaction.mockImplementationOnce(async (fn: (tx: unknown) => Promise<void>) => {
-      mockTitleDedup.mockResolvedValueOnce(null);
-      mockDedup.mockResolvedValueOnce(FAKE_DUP);
-      return fn({ execute: vi.fn(), insert: vi.fn() });
+    mockCandidates.mockResolvedValueOnce([
+      {
+        ...FAKE_DUP,
+        semanticData: FAKE_ANALYSIS,
+      },
+    ]);
+    mockVerifyDuplicate.mockResolvedValueOnce({
+      candidateId: FAKE_DUP.id,
+      relationship: "same_goal",
+      confidence: 0.96,
+      reason: "Both goals complete the Inca Trail.",
     });
 
     const res = await makeApp().request("/api/items/create", {
@@ -161,7 +217,6 @@ describe("POST /api/items/create", () => {
   });
 
   it("bypasses dedup check when force=true", async () => {
-    mockEmbed.mockResolvedValueOnce(FAKE_EMBEDDING);
     anyDb.transaction.mockImplementationOnce(
       async (fn: (tx: unknown) => Promise<typeof FAKE_ITEM>) => fn(fakeInsertTx()),
     );
@@ -175,19 +230,16 @@ describe("POST /api/items/create", () => {
     });
 
     expect(res.status).toBe(201);
-    expect(mockDedup).not.toHaveBeenCalled();
+    expect(mockCandidates).not.toHaveBeenCalled();
+    expect(mockSemanticKeyDup).not.toHaveBeenCalled();
   });
 
-  it("returns 409 when a canonical title duplicate is found", async () => {
-    mockEmbed.mockResolvedValueOnce(FAKE_EMBEDDING);
-    anyDb.transaction.mockImplementationOnce(async (fn: (tx: unknown) => Promise<void>) => {
-      mockTitleDedup.mockResolvedValueOnce({
-        ...FAKE_DUP,
-        title: "See the Northern Lights",
-        distance: 0,
-        similarity: 1,
-      });
-      return fn({ execute: vi.fn(), insert: vi.fn() });
+  it("returns 409 when an exact semantic key already exists", async () => {
+    mockSemanticKeyDup.mockResolvedValueOnce({
+      ...FAKE_DUP,
+      title: "See the Northern Lights",
+      distance: 0,
+      similarity: 1,
     });
 
     const res = await makeApp().request("/api/items/create", {
@@ -197,7 +249,7 @@ describe("POST /api/items/create", () => {
     });
 
     expect(res.status).toBe(409);
-    expect(mockDedup).not.toHaveBeenCalled();
+    expect(mockCandidates).not.toHaveBeenCalled();
     const body = await res.json();
     expect(body.match.title).toBe("See the Northern Lights");
   });
@@ -215,10 +267,6 @@ describe("POST /api/items/create", () => {
 // ── GET /api/items/precheck ────────────────────────────────────────────────────
 describe("GET /api/items/precheck", () => {
   it("returns 200 with isDuplicate:false when no match", async () => {
-    mockTitleDedup.mockResolvedValueOnce(null);
-    mockEmbed.mockResolvedValueOnce(FAKE_EMBEDDING);
-    mockDedup.mockResolvedValueOnce(null);
-
     const res = await makeApp().request("/api/items/precheck?title=Hike+the+Inca+Trail");
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -226,9 +274,13 @@ describe("GET /api/items/precheck", () => {
   });
 
   it("returns 409 with match when a duplicate exists", async () => {
-    mockTitleDedup.mockResolvedValueOnce(null);
-    mockEmbed.mockResolvedValueOnce(FAKE_EMBEDDING);
-    mockDedup.mockResolvedValueOnce(FAKE_DUP);
+    mockCandidates.mockResolvedValueOnce([{ ...FAKE_DUP, semanticData: FAKE_ANALYSIS }]);
+    mockVerifyDuplicate.mockResolvedValueOnce({
+      candidateId: FAKE_DUP.id,
+      relationship: "same_goal",
+      confidence: 0.92,
+      reason: "Same trail goal.",
+    });
 
     const res = await makeApp().request("/api/items/precheck?title=Hike+Inca+Trail");
     expect(res.status).toBe(409);
@@ -236,8 +288,8 @@ describe("GET /api/items/precheck", () => {
     expect(body.match.id).toBe("item-000");
   });
 
-  it("returns 409 from precheck when a canonical title duplicate exists", async () => {
-    mockTitleDedup.mockResolvedValueOnce({
+  it("returns 409 from precheck when a semantic key matches", async () => {
+    mockSemanticKeyDup.mockResolvedValueOnce({
       ...FAKE_DUP,
       title: "See the Northern Lights",
       distance: 0,
@@ -246,8 +298,8 @@ describe("GET /api/items/precheck", () => {
 
     const res = await makeApp().request("/api/items/precheck?title=Northern+lights");
     expect(res.status).toBe(409);
-    expect(mockEmbed).not.toHaveBeenCalled();
-    expect(mockDedup).not.toHaveBeenCalled();
+    expect(mockCandidates).not.toHaveBeenCalled();
+    expect(mockVerifyDuplicate).not.toHaveBeenCalled();
     const body = await res.json();
     expect(body.match.title).toBe("See the Northern Lights");
   });
